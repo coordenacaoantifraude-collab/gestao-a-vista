@@ -38,6 +38,20 @@ body{margin:0;background:#080b12;min-height:100vh}
 .md-t th{text-align:left;font-weight:600;color:rgba(242,245,250,.7);padding:.4rem .3rem;border-bottom:1px solid rgba(255,255,255,.12)}
 .md-t td{padding:.45rem .3rem;border-bottom:1px solid rgba(255,255,255,.06);vertical-align:middle}
 .md-t td:last-child{text-align:right;white-space:nowrap}
+.pu{position:static;inset:auto;display:block;background:#080b12;padding:1.25rem 16px;min-height:100vh}
+.pu[hidden]{display:none}
+.pu-c{max-width:64rem;margin:0 auto;display:flex;flex-direction:column;gap:1rem}
+.pu-topo{display:flex;justify-content:flex-start;padding-right:16rem}
+.pu-cap{font-size:.6875rem;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:rgba(242,245,250,.7)}
+.pu h1{margin:.2rem 0;font-size:1.8rem}
+.pu-sub{margin:0;font-size:.85rem;color:rgba(242,245,250,.7)}
+.pu-card{background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.10);border-radius:1.25rem;padding:1.125rem;display:flex;flex-direction:column;gap:.75rem}
+.pu-card h2{margin:0;font-size:1rem}
+.pu-n{font-weight:400;color:rgba(242,245,250,.6);font-size:.85rem}
+.pu-scroll{overflow-x:auto}
+.md select{font:inherit;font-size:.85rem;padding:.5rem .6rem;border-radius:.6rem;border:1px solid rgba(255,255,255,.18);background:#151b27;color:inherit}
+.md-t select{font-size:.75rem;padding:.25rem .4rem}
+body.em-usuarios .gv{display:none}
 .tag{font-size:.65rem;padding:.05rem .4rem;border-radius:999px;border:1px solid rgba(255,255,255,.25);margin-left:.3rem;color:rgba(242,245,250,.8)}
 </style>
 </head>
@@ -57,20 +71,45 @@ body{margin:0;background:#080b12;min-height:100vh}
   <button type="button" id="b-senha">Trocar senha</button>
   <button type="button" id="sair">Sair</button>
 </div>
-<div class="md" id="md-usuarios" hidden role="dialog" aria-modal="true" aria-labelledby="mu-t">
-  <div class="md-c">
-    <div class="md-h"><h2 id="mu-t">Usuários do painel</h2><button type="button" class="md-x" data-fechar aria-label="Fechar">×</button></div>
-    <form id="mu-form"><input id="mu-email" type="email" placeholder="E-mail da pessoa" aria-label="E-mail da pessoa" required><button class="pri" type="submit">Cadastrar</button></form>
-    <div class="md-senha" id="mu-senha" hidden>
-      <span id="mu-senha-t"></span>
-      <code id="mu-senha-c"></code>
-      <span>Copie e envie à pessoa por um canal seguro. Esta senha não aparece de novo; a pessoa pode trocá-la em "Trocar senha".</span>
-      <div><button class="sec" type="button" id="mu-copiar">Copiar senha</button></div>
+<main class="pu md" id="pg-usuarios" hidden aria-labelledby="pu-t">
+  <div class="pu-c">
+    <div class="pu-topo">
+      <button type="button" class="sec" id="pu-voltar">← Voltar ao painel</button>
     </div>
-    <p class="md-erro" id="mu-erro" role="alert"></p>
-    <table class="md-t"><thead><tr><th>E-mail</th><th>Último acesso</th><th></th></tr></thead><tbody id="mu-lista"></tbody></table>
+    <div class="pu-cab">
+      <div>
+        <div class="pu-cap">Gestão à vista · Risco Consignado</div>
+        <h1 id="pu-t">Usuários</h1>
+        <p class="pu-sub"><b>Administrador</b>: vê o painel e gerencia usuários. <b>Operacional</b>: só vê o painel.</p>
+      </div>
+    </div>
+    <section class="pu-card">
+      <h2>Cadastrar pessoa</h2>
+      <form id="mu-form">
+        <input id="mu-email" type="email" placeholder="E-mail da pessoa" aria-label="E-mail da pessoa" required>
+        <select id="mu-perfil" aria-label="Perfil">
+          <option value="operacional">Operacional</option>
+          <option value="administrador">Administrador</option>
+        </select>
+        <button class="pri" type="submit">Cadastrar</button>
+      </form>
+      <div class="md-senha" id="mu-senha" hidden>
+        <span id="mu-senha-t"></span>
+        <code id="mu-senha-c"></code>
+        <span>Copie e envie à pessoa por um canal seguro. Esta senha não aparece de novo; a pessoa pode trocá-la em "Trocar senha".</span>
+        <div><button class="sec" type="button" id="mu-copiar">Copiar senha</button> <button class="sec" type="button" id="mu-ocultar">Ocultar</button></div>
+      </div>
+      <p class="md-erro" id="mu-erro" role="alert"></p>
+      <p class="md-ok" id="mu-ok" role="status"></p>
+    </section>
+    <section class="pu-card">
+      <h2>Quem tem acesso <span class="pu-n" id="mu-n"></span></h2>
+      <div class="pu-scroll">
+        <table class="md-t"><thead><tr><th>E-mail</th><th>Perfil</th><th>Cadastro</th><th>Último acesso</th><th></th></tr></thead><tbody id="mu-lista"></tbody></table>
+      </div>
+    </section>
   </div>
-</div>
+</main>
 <div class="md" id="md-senha" hidden role="dialog" aria-modal="true" aria-labelledby="ms-t">
   <div class="md-c" style="max-width:24rem">
     <div class="md-h"><h2 id="ms-t">Trocar minha senha</h2><button type="button" class="md-x" data-fechar aria-label="Fechar">×</button></div>
@@ -605,21 +644,23 @@ if (named && named.dataset && named.dataset.pg) { page = named.dataset.pg; tabs(
     timer = setInterval(carregar, CONFIG.atualizarSeg * 1000);
     const {data: admin} = await sb.rpc('sou_admin');
     document.getElementById('b-usuarios').hidden = !admin;
+    rota();
   }
   function saiu() {
     clearInterval(timer);
     lg.hidden = false; barra.hidden = true;
     document.querySelectorAll('.md').forEach((m) => { m.hidden = true; });
     document.getElementById('b-usuarios').hidden = true;
+    document.body.classList.remove('em-usuarios');
   }
 
   // ---------------------------------------------------------------- janelas
   const abrir = (id) => { document.getElementById(id).hidden = false; };
-  document.querySelectorAll('.md').forEach((m) => {
+  document.querySelectorAll('.md:not(.pu)').forEach((m) => {
     m.addEventListener('click', (e) => { if (e.target === m || e.target.hasAttribute('data-fechar')) m.hidden = true; });
   });
   document.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape') document.querySelectorAll('.md').forEach((m) => { m.hidden = true; });
+    if (e.key === 'Escape') document.querySelectorAll('.md:not(.pu)').forEach((m) => { m.hidden = true; });
   });
 
   // ---------------------------------------------------------------- trocar a própria senha
@@ -659,15 +700,35 @@ if (named && named.dataset && named.dataset.pg) { page = named.dataset.pg; tabs(
     document.getElementById('mu-senha-c').textContent = senha;
     document.getElementById('mu-senha').hidden = false;
   }
+  const okU = document.getElementById('mu-ok');
+  const avisar = (texto) => { okU.textContent = texto; setTimeout(() => { if (okU.textContent === texto) okU.textContent = ''; }, 4000); };
   async function listarUsuarios() {
     const corpo = document.getElementById('mu-lista');
     try {
       const {usuarios} = await servicoUsuarios('listar');
+      const adm = usuarios.filter((u) => u.administrador).length;
+      document.getElementById('mu-n').textContent = '· ' + usuarios.length + (usuarios.length === 1 ? ' pessoa' : ' pessoas') +
+        ' (' + adm + (adm === 1 ? ' administrador' : ' administradores') + ')';
       corpo.replaceChildren(...usuarios.map((u) => {
         const tr = document.createElement('tr');
         const td1 = document.createElement('td'); td1.textContent = u.email;
         if (u.voce) { const t = document.createElement('span'); t.className = 'tag'; t.textContent = 'você'; td1.append(t); }
-        if (u.administrador) { const t = document.createElement('span'); t.className = 'tag'; t.textContent = 'administrador'; td1.append(t); }
+        const tdP = document.createElement('td');
+        const sel = document.createElement('select');
+        sel.setAttribute('aria-label', 'Perfil de ' + u.email);
+        sel.append(new Option('Operacional', 'operacional'), new Option('Administrador', 'administrador'));
+        sel.value = u.administrador ? 'administrador' : 'operacional';
+        sel.disabled = u.voce;   // ninguém tira o próprio perfil de administrador
+        if (u.voce) sel.title = 'Você não pode mudar o seu próprio perfil';
+        sel.addEventListener('change', async () => {
+          erroU.textContent = '';
+          const rotulo = sel.value === 'administrador' ? 'Administrador' : 'Operacional';
+          if (!confirm('Mudar o perfil de ' + u.email + ' para ' + rotulo + '?')) { sel.value = u.administrador ? 'administrador' : 'operacional'; return; }
+          try { await servicoUsuarios('perfil', {id: u.id, perfil: sel.value}); avisar('Perfil de ' + u.email + ' agora é ' + rotulo + '.'); listarUsuarios(); }
+          catch (err) { erroU.textContent = err.message; listarUsuarios(); }
+        });
+        tdP.append(sel);
+        const tdC = document.createElement('td'); tdC.textContent = quando(u.criado_em);
         const td2 = document.createElement('td'); td2.textContent = quando(u.ultimo_acesso);
         const td3 = document.createElement('td');
         const bNova = document.createElement('button'); bNova.className = 'sec'; bNova.type = 'button'; bNova.textContent = 'Nova senha';
@@ -680,27 +741,45 @@ if (named && named.dataset && named.dataset.pg) { page = named.dataset.pg; tabs(
         bRem.style.marginLeft = '.3rem'; bRem.disabled = u.voce;
         bRem.addEventListener('click', async () => {
           if (!confirm('Remover o acesso de ' + u.email + ' ao painel?')) return;
-          try { await servicoUsuarios('remover', {id: u.id}); listarUsuarios(); }
+          try { await servicoUsuarios('remover', {id: u.id}); avisar('Acesso de ' + u.email + ' removido.'); listarUsuarios(); }
           catch (err) { erroU.textContent = err.message; }
         });
         td3.append(bNova, bRem);
-        tr.append(td1, td2, td3);
+        tr.append(td1, tdP, tdC, td2, td3);
         return tr;
       }));
     } catch (err) { erroU.textContent = err.message; }
   }
+
+  // "Usuários" é uma página própria (#usuarios): o painel some e volta com "Voltar ao painel" ou o Voltar do navegador.
+  const pagUsu = document.getElementById('pg-usuarios');
+  function rota() {
+    const naPagina = location.hash === '#usuarios' && !document.getElementById('b-usuarios').hidden;
+    pagUsu.hidden = !naPagina;
+    document.body.classList.toggle('em-usuarios', naPagina);
+    document.getElementById('b-usuarios').textContent = naPagina ? 'Painel' : 'Usuários';
+    if (naPagina) {
+      erroU.textContent = ''; okU.textContent = ''; document.getElementById('mu-senha').hidden = true;
+      window.scrollTo(0, 0);
+      listarUsuarios();
+    }
+  }
+  window.addEventListener('hashchange', rota);
   document.getElementById('b-usuarios').addEventListener('click', () => {
-    erroU.textContent = ''; document.getElementById('mu-senha').hidden = true;
-    abrir('md-usuarios'); listarUsuarios();
+    if (location.hash === '#usuarios') history.back(); else location.hash = 'usuarios';
   });
+  document.getElementById('pu-voltar').addEventListener('click', () => {
+    history.replaceState(null, '', location.pathname); rota();
+  });
+  document.getElementById('mu-ocultar').addEventListener('click', () => { document.getElementById('mu-senha').hidden = true; });
   document.getElementById('mu-form').addEventListener('submit', async (e) => {
     e.preventDefault();
     erroU.textContent = ''; document.getElementById('mu-senha').hidden = true;
-    const campo = document.getElementById('mu-email');
+    const campo = document.getElementById('mu-email'), perfil = document.getElementById('mu-perfil');
     try {
-      const r = await servicoUsuarios('criar', {email: campo.value});
-      mostrarSenha('Acesso criado para ' + r.email + '. Senha inicial:', r.senha);
-      campo.value = '';
+      const r = await servicoUsuarios('criar', {email: campo.value, perfil: perfil.value});
+      mostrarSenha('Acesso criado para ' + r.email + ' (' + (r.perfil === 'administrador' ? 'Administrador' : 'Operacional') + '). Senha inicial:', r.senha);
+      campo.value = ''; perfil.value = 'operacional';
       listarUsuarios();
     } catch (err) { erroU.textContent = err.message; }
   });
