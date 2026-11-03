@@ -17,8 +17,28 @@ body{margin:0;background:#080b12;min-height:100vh}
 .lg button{font:inherit;font-weight:600;padding:.65rem;border-radius:.6rem;border:0;background:#3D7BFF;color:#fff;cursor:pointer}
 .lg button:disabled{opacity:.6;cursor:wait}
 .lg .erro{color:#FF7A70;min-height:1.2em}
-.sair{position:fixed;top:10px;right:12px;z-index:5;font:600 .75rem 'Sora',sans-serif;padding:.35rem .7rem;border-radius:999px;border:1px solid rgba(255,255,255,.18);background:rgba(8,11,18,.8);color:#F2F5FA;cursor:pointer}
-.sair[hidden]{display:none}
+.barra{position:fixed;top:10px;right:12px;z-index:5;display:flex;gap:.4rem}
+.barra[hidden],.barra button[hidden],.md[hidden],.md-senha[hidden]{display:none}
+.barra button{font:600 .75rem 'Sora',sans-serif;padding:.35rem .7rem;border-radius:999px;border:1px solid rgba(255,255,255,.18);background:rgba(8,11,18,.8);color:#F2F5FA;cursor:pointer}
+.md{position:fixed;inset:0;z-index:20;display:flex;align-items:flex-start;justify-content:center;padding:16px;background:rgba(0,0,0,.6);overflow:auto;font-family:'Sora',sans-serif;color:#F2F5FA}
+.md-c{width:100%;max-width:40rem;margin-top:4vh;background:#10151f;border:1px solid rgba(255,255,255,.12);border-radius:1.25rem;padding:1.25rem;display:flex;flex-direction:column;gap:.8rem}
+.md-h{display:flex;justify-content:space-between;align-items:center}
+.md-h h2{margin:0;font-size:1.05rem}
+.md-x{background:none;border:0;color:inherit;font-size:1.4rem;cursor:pointer;line-height:1}
+.md form{display:flex;gap:.5rem;flex-wrap:wrap}
+.md input{flex:1;min-width:12rem;font:inherit;font-size:.85rem;padding:.55rem .7rem;border-radius:.6rem;border:1px solid rgba(255,255,255,.18);background:rgba(255,255,255,.06);color:inherit}
+.md button.pri{font:inherit;font-weight:600;font-size:.85rem;padding:.55rem .9rem;border-radius:.6rem;border:0;background:#3D7BFF;color:#fff;cursor:pointer}
+.md button.sec{font:inherit;font-size:.75rem;padding:.3rem .6rem;border-radius:.5rem;border:1px solid rgba(255,255,255,.2);background:none;color:inherit;cursor:pointer}
+.md button:disabled{opacity:.5;cursor:default}
+.md-senha{background:rgba(61,123,255,.15);border:1px solid rgba(61,123,255,.5);border-radius:.8rem;padding:.75rem;font-size:.85rem;display:flex;flex-direction:column;gap:.4rem}
+.md-senha code{font-size:1.1rem;letter-spacing:.05em;user-select:all}
+.md-erro{margin:0;color:#FF7A70;font-size:.8rem;min-height:1em}
+.md-ok{margin:0;color:#7fd99a;font-size:.8rem;min-height:1em}
+.md-t{width:100%;border-collapse:collapse;font-size:.8rem}
+.md-t th{text-align:left;font-weight:600;color:rgba(242,245,250,.7);padding:.4rem .3rem;border-bottom:1px solid rgba(255,255,255,.12)}
+.md-t td{padding:.45rem .3rem;border-bottom:1px solid rgba(255,255,255,.06);vertical-align:middle}
+.md-t td:last-child{text-align:right;white-space:nowrap}
+.tag{font-size:.65rem;padding:.05rem .4rem;border-radius:999px;border:1px solid rgba(255,255,255,.25);margin-left:.3rem;color:rgba(242,245,250,.8)}
 </style>
 </head>
 <body>
@@ -32,7 +52,37 @@ body{margin:0;background:#080b12;min-height:100vh}
     <p class="erro" id="lg-erro" role="alert"></p>
   </form>
 </div>
-<button class="sair" id="sair" type="button" hidden>Sair</button>
+<div class="barra" id="barra" hidden>
+  <button type="button" id="b-usuarios" hidden>Usuários</button>
+  <button type="button" id="b-senha">Trocar senha</button>
+  <button type="button" id="sair">Sair</button>
+</div>
+<div class="md" id="md-usuarios" hidden role="dialog" aria-modal="true" aria-labelledby="mu-t">
+  <div class="md-c">
+    <div class="md-h"><h2 id="mu-t">Usuários do painel</h2><button type="button" class="md-x" data-fechar aria-label="Fechar">×</button></div>
+    <form id="mu-form"><input id="mu-email" type="email" placeholder="E-mail da pessoa" aria-label="E-mail da pessoa" required><button class="pri" type="submit">Cadastrar</button></form>
+    <div class="md-senha" id="mu-senha" hidden>
+      <span id="mu-senha-t"></span>
+      <code id="mu-senha-c"></code>
+      <span>Copie e envie à pessoa por um canal seguro. Esta senha não aparece de novo; a pessoa pode trocá-la em "Trocar senha".</span>
+      <div><button class="sec" type="button" id="mu-copiar">Copiar senha</button></div>
+    </div>
+    <p class="md-erro" id="mu-erro" role="alert"></p>
+    <table class="md-t"><thead><tr><th>E-mail</th><th>Último acesso</th><th></th></tr></thead><tbody id="mu-lista"></tbody></table>
+  </div>
+</div>
+<div class="md" id="md-senha" hidden role="dialog" aria-modal="true" aria-labelledby="ms-t">
+  <div class="md-c" style="max-width:24rem">
+    <div class="md-h"><h2 id="ms-t">Trocar minha senha</h2><button type="button" class="md-x" data-fechar aria-label="Fechar">×</button></div>
+    <form id="ms-form" style="flex-direction:column">
+      <input id="ms-1" type="password" autocomplete="new-password" minlength="8" placeholder="Nova senha (mínimo 8 caracteres)" aria-label="Nova senha" required>
+      <input id="ms-2" type="password" autocomplete="new-password" minlength="8" placeholder="Repita a nova senha" aria-label="Repita a nova senha" required>
+      <button class="pri" type="submit">Salvar nova senha</button>
+    </form>
+    <p class="md-erro" id="ms-erro" role="alert"></p>
+    <p class="md-ok" id="ms-ok"></p>
+  </div>
+</div>
 <script>
 // Configuração do projeto. A chave publicável é feita para ficar na página:
 // quem protege os dados é o login + a regra de acesso (RLS) da tabela.
@@ -536,7 +586,7 @@ if (named && named.dataset && named.dataset.pg) { page = named.dataset.pg; tabs(
 <script>
 (() => {
   const sb = supabase.createClient(CONFIG.url, CONFIG.chave);
-  const lg = document.getElementById('lg'), sair = document.getElementById('sair');
+  const lg = document.getElementById('lg'), sair = document.getElementById('sair'), barra = document.getElementById('barra');
   const erro = document.getElementById('lg-erro'), btn = document.getElementById('lg-btn');
   let timer = null;
 
@@ -548,16 +598,117 @@ if (named && named.dataset && named.dataset.pg) { page = named.dataset.pg; tabs(
     if (faltam.length) return dash._falhar('Sem acesso ou sem dados: ' + faltam.join(', '));
     dash._carregar(conj);
   }
-  function entrou() {
-    lg.hidden = true; sair.hidden = false;
+  async function entrou() {
+    lg.hidden = true; barra.hidden = false;
     carregar();
     clearInterval(timer);
     timer = setInterval(carregar, CONFIG.atualizarSeg * 1000);
+    const {data: admin} = await sb.rpc('sou_admin');
+    document.getElementById('b-usuarios').hidden = !admin;
   }
   function saiu() {
     clearInterval(timer);
-    lg.hidden = false; sair.hidden = true;
+    lg.hidden = false; barra.hidden = true;
+    document.querySelectorAll('.md').forEach((m) => { m.hidden = true; });
+    document.getElementById('b-usuarios').hidden = true;
   }
+
+  // ---------------------------------------------------------------- janelas
+  const abrir = (id) => { document.getElementById(id).hidden = false; };
+  document.querySelectorAll('.md').forEach((m) => {
+    m.addEventListener('click', (e) => { if (e.target === m || e.target.hasAttribute('data-fechar')) m.hidden = true; });
+  });
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') document.querySelectorAll('.md').forEach((m) => { m.hidden = true; });
+  });
+
+  // ---------------------------------------------------------------- trocar a própria senha
+  document.getElementById('b-senha').addEventListener('click', () => {
+    document.getElementById('ms-form').reset();
+    document.getElementById('ms-erro').textContent = ''; document.getElementById('ms-ok').textContent = '';
+    abrir('md-senha'); document.getElementById('ms-1').focus();
+  });
+  document.getElementById('ms-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const s1 = document.getElementById('ms-1').value, s2 = document.getElementById('ms-2').value;
+    const erroS = document.getElementById('ms-erro'), ok = document.getElementById('ms-ok');
+    erroS.textContent = ''; ok.textContent = '';
+    if (s1 !== s2) { erroS.textContent = 'As duas senhas não são iguais.'; return; }
+    const {error} = await sb.auth.updateUser({password: s1});
+    if (error) { erroS.textContent = 'Não foi possível trocar: ' + error.message; return; }
+    e.target.reset();
+    ok.textContent = 'Senha trocada. Use a nova no próximo login.';
+  });
+
+  // ---------------------------------------------------------------- usuários (só administradores)
+  async function servicoUsuarios(acao, extra) {
+    const {data: {session}} = await sb.auth.getSession();
+    const r = await fetch(CONFIG.url + '/functions/v1/usuarios', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json', apikey: CONFIG.chave, Authorization: 'Bearer ' + session.access_token},
+      body: JSON.stringify(Object.assign({acao}, extra || {})),
+    });
+    const j = await r.json().catch(() => ({erro: 'resposta inválida do serviço'}));
+    if (!r.ok) throw new Error(j.erro || ('HTTP ' + r.status));
+    return j;
+  }
+  const erroU = document.getElementById('mu-erro');
+  const quando = (iso) => iso ? new Date(iso).toLocaleString('pt-BR', {dateStyle: 'short', timeStyle: 'short', timeZone: 'America/Sao_Paulo'}) : 'nunca';
+  function mostrarSenha(texto, senha) {
+    document.getElementById('mu-senha-t').textContent = texto;
+    document.getElementById('mu-senha-c').textContent = senha;
+    document.getElementById('mu-senha').hidden = false;
+  }
+  async function listarUsuarios() {
+    const corpo = document.getElementById('mu-lista');
+    try {
+      const {usuarios} = await servicoUsuarios('listar');
+      corpo.replaceChildren(...usuarios.map((u) => {
+        const tr = document.createElement('tr');
+        const td1 = document.createElement('td'); td1.textContent = u.email;
+        if (u.voce) { const t = document.createElement('span'); t.className = 'tag'; t.textContent = 'você'; td1.append(t); }
+        if (u.administrador) { const t = document.createElement('span'); t.className = 'tag'; t.textContent = 'administrador'; td1.append(t); }
+        const td2 = document.createElement('td'); td2.textContent = quando(u.ultimo_acesso);
+        const td3 = document.createElement('td');
+        const bNova = document.createElement('button'); bNova.className = 'sec'; bNova.type = 'button'; bNova.textContent = 'Nova senha';
+        bNova.addEventListener('click', async () => {
+          if (!confirm('Gerar uma nova senha para ' + u.email + '? A senha atual deixa de funcionar.')) return;
+          try { const r = await servicoUsuarios('nova_senha', {id: u.id}); mostrarSenha('Nova senha de ' + r.email + ':', r.senha); }
+          catch (err) { erroU.textContent = err.message; }
+        });
+        const bRem = document.createElement('button'); bRem.className = 'sec'; bRem.type = 'button'; bRem.textContent = 'Remover';
+        bRem.style.marginLeft = '.3rem'; bRem.disabled = u.voce;
+        bRem.addEventListener('click', async () => {
+          if (!confirm('Remover o acesso de ' + u.email + ' ao painel?')) return;
+          try { await servicoUsuarios('remover', {id: u.id}); listarUsuarios(); }
+          catch (err) { erroU.textContent = err.message; }
+        });
+        td3.append(bNova, bRem);
+        tr.append(td1, td2, td3);
+        return tr;
+      }));
+    } catch (err) { erroU.textContent = err.message; }
+  }
+  document.getElementById('b-usuarios').addEventListener('click', () => {
+    erroU.textContent = ''; document.getElementById('mu-senha').hidden = true;
+    abrir('md-usuarios'); listarUsuarios();
+  });
+  document.getElementById('mu-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    erroU.textContent = ''; document.getElementById('mu-senha').hidden = true;
+    const campo = document.getElementById('mu-email');
+    try {
+      const r = await servicoUsuarios('criar', {email: campo.value});
+      mostrarSenha('Acesso criado para ' + r.email + '. Senha inicial:', r.senha);
+      campo.value = '';
+      listarUsuarios();
+    } catch (err) { erroU.textContent = err.message; }
+  });
+  document.getElementById('mu-copiar').addEventListener('click', async () => {
+    try { await navigator.clipboard.writeText(document.getElementById('mu-senha-c').textContent); document.getElementById('mu-copiar').textContent = 'Copiada'; }
+    catch { erroU.textContent = 'Não consegui copiar; selecione a senha e copie com Ctrl+C.'; }
+    setTimeout(() => { document.getElementById('mu-copiar').textContent = 'Copiar senha'; }, 2000);
+  });
 
   document.getElementById('lg-form').addEventListener('submit', async (e) => {
     e.preventDefault();
