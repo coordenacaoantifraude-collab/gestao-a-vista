@@ -39,7 +39,7 @@ body{margin:0;background:#080b12;min-height:100vh}
 const CONFIG = {
   url: 'https://urfumtljzwzyizhmzwlv.supabase.co',
   chave: 'sb_publishable_-b59pJ2NL2OQ0Q5ZQRlSnQ_FIKiVydn',
-  tabela: 'painel_conjuntos_teste',
+  tabela: 'painel_conjuntos',
   atualizarSeg: 60,
 };
 const CONJUNTOS = ['bancos', 'caixas', 'propostas', 'finalizadas', 'status'];
@@ -194,7 +194,7 @@ font-family:'Sora',sans-serif;font-size:.9375rem;line-height:1.5;color:var(--fg)
         <button class="gv-btn ghost" id="gv-size" type="button" aria-haspopup="true" aria-expanded="false" aria-label="Tamanho do texto" title="Tamanho do texto"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v16"/><path d="M4 7V5a1 1 0 0 1 1-1h14a1 1 0 0 1 1 1v2"/><path d="M9 20h6"/></svg><span id="gv-size-l">A</span></button>
         <div class="gv-pop" id="gv-pop" hidden role="group" aria-label="Tamanho do texto"><button type="button" data-s="1" aria-pressed="true">A</button><button type="button" data-s="1.25" aria-pressed="false">A+</button><button type="button" data-s="1.55" aria-pressed="false">A++</button></div>
       </div>
-      <div class="gv-meta"><span class="gv-chip" id="gv-fonte"><i class="gv-dot ok"></i>Robô · tabela de teste (dados fictícios)</span><span>Caixas e importações às <b data-source="status" data-field="atualizado_em" data-row="0">—</b> · SLA do dia às <b data-source="status" data-field="sla_lido_em" data-row="0">—</b> · atualização automática pelo robô a cada 15 minutos, em dias úteis, das 9h às 18h45</span></div>
+      <div class="gv-meta"><span class="gv-chip" id="gv-fonte"><i class="gv-dot ok"></i>Robô · dados da WebDec</span><span>Caixas e importações às <b data-source="status" data-field="atualizado_em" data-row="0">—</b> · SLA do dia às <b data-source="status" data-field="sla_lido_em" data-row="0">—</b> · atualização automática pelo robô a cada 15 minutos, em dias úteis, das 9h às 18h45</span></div>
       <div class="gv-tabs" role="tablist" aria-label="Visões">
         <button role="tab" id="tab-agora" aria-selected="true" data-pg="agora"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M22 12h-2.48a2 2 0 0 0-1.93 1.46l-2.35 8.36a.25.25 0 0 1-.48 0L9.24 2.18a.25.25 0 0 0-.48 0l-2.35 8.36A2 2 0 0 1 4.48 12H2"/></svg> Agora</button>
         <button role="tab" id="tab-sla" aria-selected="false" data-pg="sla"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M10 2h4"/><path d="m12 14 3-3"/><circle cx="12" cy="14" r="8"/></svg> SLA do dia</button>
@@ -493,7 +493,7 @@ function avisoVelho(atualizado) {
   const velho = comercial && idade > 60;
   const chip = $('#gv-fonte');
   chip.replaceChildren(h('i', 'gv-dot ' + (velho ? 'bad' : 'ok')),
-    document.createTextNode(velho ? 'Dados velhos: sem atualização há ' + dur(idade) + '. Ver o robô.' : 'Robô · tabela de teste (dados fictícios)'));
+    document.createTextNode(velho ? 'Dados velhos: sem atualização há ' + dur(idade) + '. Ver o robô.' : 'Robô · dados da WebDec'));
   chip.style.borderColor = velho ? 'var(--red)' : '';
 }
 function render() {
