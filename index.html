@@ -499,7 +499,7 @@ function slakpis(rows) {
 function slatabelas(st, fx, bk) {
   fillTable($('#gv-sla-status tbody'), st, (r) => r.status, [[(r) => r.status], [(r) => NF.format(r.qtd), 'n'], [(r) => NF.format(r.no_prazo), 'n'], [(r) => String(r.pct_prazo).replace('.', ',') + '%', 'n'], [(r) => dur(r.medio), 'n'], [(r) => dur(r.mediana), 'n'], [(r) => dur(r.maximo), 'n']]);
   fillTable($('#gv-sla-banco tbody'), bk, (r) => r.banco, [[(r) => r.banco], [(r) => NF.format(r.qtd), 'n'], [(r) => String(r.pct_prazo).replace('.', ',') + '%', 'n'], [(r) => dur(r.medio), 'n'], [(r) => dur(r.maximo), 'n']]);
-  const box = $('#gv-sla-faixas'); box.replaceChildren(); const mx = d3.max(fx, (d) => d.qtd) || 1;
+  const box = $('#gv-sla-faixas'); box.replaceChildren(); const mx = Math.max(0, ...fx.map((d) => d.qtd)) || 1;
   fx.forEach((d, i) => { const row = h('div', 'gv-hrow'); row.append(h('span', null, d.faixa)); const tr = h('div', 'tr'); const f = h('i', ''); f.style.width = (d.qtd / mx * 100) + '%'; tr.append(f); row.append(tr, h('span', 'vv', NF.format(d.qtd))); box.append(row); });
 }
 function importacao(rows) {
