@@ -108,7 +108,7 @@ body.em-usuarios .gv{display:none}
     <section class="pu-card">
       <h2>Quem tem acesso <span class="pu-n" id="mu-n"></span></h2>
       <div class="pu-scroll">
-        <table class="md-t"><thead><tr><th>E-mail</th><th>Perfil</th><th>Cadastro</th><th>Último acesso</th><th></th></tr></thead><tbody id="mu-lista"></tbody></table>
+        <table class="md-t"><thead><tr><th>E-mail</th><th>Perfil</th><th>Nome na WebDec</th><th>Cadastro</th><th>Último acesso</th><th></th></tr></thead><tbody id="mu-lista"></tbody></table>
       </div>
     </section>
   </div>
@@ -292,6 +292,7 @@ font-family:'Sora',sans-serif;font-size:.9375rem;line-height:1.5;color:var(--fg)
         <button role="tab" id="tab-sla" aria-selected="false" data-pg="sla"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M10 2h4"/><path d="m12 14 3-3"/><circle cx="12" cy="14" r="8"/></svg> SLA do dia</button>
         <button role="tab" id="tab-importacao" aria-selected="false" data-pg="importacao"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m7 10 5 5 5-5"/><path d="M12 15V3"/></svg> Importações</button>
         <button role="tab" id="tab-propostas" aria-selected="false" data-pg="propostas"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h.01"/><path d="M3 12h.01"/><path d="M3 18h.01"/><path d="M8 6h13"/><path d="M8 12h13"/><path d="M8 18h13"/></svg> Propostas</button>
+        <button role="tab" id="tab-produtividade" aria-selected="false" data-pg="produtividade"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 3v18h18"/><path d="M7 16v-4"/><path d="M12 16V8"/><path d="M17 16v-7"/></svg> Produtividade</button>
       </div>
     </div>
   </header>
@@ -340,6 +341,22 @@ font-family:'Sora',sans-serif;font-size:.9375rem;line-height:1.5;color:var(--fg)
       <div class="gv-scroll"><table id="gv-bancos" data-source="importacao" data-row-key="banco">
         <thead><tr><th data-field="banco">Banco</th><th data-field="prazo">Prazo de 1 h</th><th data-field="ultima_importacao">Última carga</th><th class="n" data-field="minutos">Sem carga há</th><th class="n" data-field="lote_novas">Novas no lote</th><th data-field="origem">Origem</th><th data-field="obs">Observação</th></tr></thead><tbody></tbody></table></div>
     </div>
+  </section>
+
+  <section id="pg-produtividade" aria-labelledby="tab-produtividade" hidden style="display:flex;flex-direction:column;gap:1rem">
+    <div class="gv-panel">
+      <div class="gv-sec"><h2 id="sec-prod-total">Produtividade de hoje, equipe toda</h2><span id="gv-prod-hora">—</span></div>
+      <div class="gv-kpis" id="gv-prod-total"></div>
+    </div>
+    <div class="gv-panel" id="gv-prod-eu-box">
+      <div class="gv-sec"><h2 id="sec-prod-eu">Você hoje</h2><span id="gv-prod-eu-nome"></span></div>
+      <div class="gv-kpis" id="gv-prod-eu"></div>
+    </div>
+    <div class="gv-panel" id="gv-prod-todos-box" hidden>
+      <div class="gv-sec"><h2 id="sec-prod-todos">Por analista</h2><span>Visível só para administradores</span></div>
+      <div class="gv-scroll"><table id="gv-prod-todos"><thead></thead><tbody></tbody></table></div>
+    </div>
+    <p class="gv-note">Números do gráfico "Produtividade por Ação" do BI Antifraude da WebDec, só do dia de hoje, atualizados pelo robô a cada 15 minutos. Cada pessoa vê a própria quantidade e o total da equipe; os nomes dos outros analistas só aparecem para administradores.</p>
   </section>
 
   <section id="pg-propostas" aria-labelledby="tab-propostas" hidden style="display:flex;flex-direction:column;gap:1rem">
@@ -477,7 +494,7 @@ let page = 'agora', sortK = 'sem_atuacao', sortDir = -1;
 
 function tabs() {
   document.querySelectorAll('.gv-tabs button').forEach((b) => b.setAttribute('aria-selected', String(b.dataset.pg === page)));
-  ['agora', 'sla', 'importacao', 'propostas'].forEach((p) => { $('#pg-' + p).hidden = p !== page; });
+  ['agora', 'sla', 'importacao', 'propostas', 'produtividade'].forEach((p) => { $('#pg-' + p).hidden = p !== page; });
 }
 document.querySelectorAll('.gv-tabs button').forEach((b) => b.addEventListener('click', () => { page = b.dataset.pg; tabs(); dash.setLink(b.id); render(); }));
 $('#gv-q').addEventListener('input', () => render());
@@ -638,6 +655,45 @@ function render() {
   if (page === 'sla') { slakpis(d('sla_dia')); slatabelas(d('sla_dia'), d('sla_faixas'), d('sla_banco')); }
   if (page === 'importacao') bancos(d('importacao'));
   if (page === 'propostas') lista(d('fila'));
+  if (page === 'produtividade') produtividade(window.gvProd);
+}
+
+// Produtividade: vem de window.gvProd (carregado no script de login). O banco de dados já filtra:
+// operacional recebe só a própria linha em "linhas"; o total vem somado, sem nomes.
+const ACOES_PROD = ['Aprovações', 'Reprovações', 'Agendamentos', 'Pendências', 'Analise Documental'];
+function produtividade(p) {
+  const tot = $('#gv-prod-total'), eu = $('#gv-prod-eu');
+  if (!p) { tot.replaceChildren(h('div', 'gv-note', 'Carregando…')); return; }
+  const acoes = [...new Set([...ACOES_PROD, ...p.total.map((r) => r.acao), ...p.linhas.map((r) => r.acao)])];
+  const cartoes = (box, qtd) => {
+    const soma = acoes.reduce((a, x) => a + (qtd(x) || 0), 0);
+    box.replaceChildren(...[['Total', soma], ...acoes.map((x) => [x, qtd(x) || 0])].map(([l, v]) => {
+      const k = h('div', 'gv-panel gv-kpi'); k.append(h('div', 'l', l), h('div', 'v', NF.format(v))); return k; }));
+  };
+  const totMap = Object.fromEntries(p.total.map((r) => [r.acao, Number(r.qtd)]));
+  cartoes(tot, (x) => totMap[x]);
+  $('#gv-prod-hora').textContent = p.atualizado ? 'Atualizado às ' + hhmm(p.atualizado) : 'Ainda sem leitura hoje';
+  if (p.meu) {
+    $('#gv-prod-eu-nome').textContent = p.meu;
+    const meus = Object.fromEntries(p.linhas.filter((r) => r.analista === p.meu).map((r) => [r.acao, r.qtd]));
+    cartoes(eu, (x) => meus[x]);
+  } else {
+    $('#gv-prod-eu-nome').textContent = '';
+    eu.replaceChildren(h('div', 'gv-note', p.admin
+      ? 'Seu login não está ligado a um nome da WebDec. Ligue em Usuários > Nome na WebDec.'
+      : 'Seu login ainda não está ligado ao seu nome na WebDec. Peça a um administrador para fazer o vínculo.'));
+  }
+  const box = $('#gv-prod-todos-box'); box.hidden = !p.admin;
+  if (p.admin) {
+    const nomes = [...new Set(p.linhas.map((r) => r.analista))];
+    const q = (n, x) => (p.linhas.find((r) => r.analista === n && r.acao === x) || {}).qtd || 0;
+    const linhas = nomes.map((n) => ({n, por: acoes.map((x) => q(n, x)), tot: acoes.reduce((a, x) => a + q(n, x), 0)})).sort((a, b) => b.tot - a.tot);
+    const th = document.createElement('tr'); th.append(h('th', '', 'Analista'), ...acoes.map((x) => h('th', 'n', x)), h('th', 'n', 'Total'));
+    $('#gv-prod-todos thead').replaceChildren(th);
+    const tb = $('#gv-prod-todos tbody'); tb.replaceChildren();
+    if (!linhas.length) { const tr = document.createElement('tr'); const td = h('td', '', 'Nenhuma ação registrada hoje.'); td.colSpan = acoes.length + 2; tr.append(td); tb.append(tr); }
+    linhas.forEach((l) => { const tr = document.createElement('tr'); tr.append(h('td', '', l.n), ...l.por.map((v) => h('td', 'n', NF.format(v))), h('td', 'n', NF.format(l.tot))); tb.append(tr); });
+  }
 }
 
 const root = $('.gv');
@@ -672,6 +728,16 @@ if (named && named.dataset && named.dataset.pg) { page = named.dataset.pg; tabs(
     // Marcações "sem operação hoje" (se falhar, o painel segue cobrando todos os bancos).
     const {data: marc} = await sb.from('bancos_sem_operacao').select('banco,marcado_por,marcado_em').eq('dia', hojeBR());
     conj.sem_operacao = marc || [];
+    // Produtividade do dia: o banco de dados devolve todas as linhas ao administrador e só a
+    // própria ao operacional; o total da equipe vem somado, sem nomes.
+    const dia = hojeBR();
+    const [tot, meu, lin] = await Promise.all([
+      sb.rpc('produtividade_total', {p_dia: dia}),
+      sb.rpc('meu_analista'),
+      sb.from('produtividade').select('analista,acao,qtd,atualizado_em').eq('dia', dia)]);
+    const linhas = lin.data || [];
+    window.gvProd = {total: tot.data || [], meu: meu.data || null, admin: !!window.gvAdmin, linhas,
+      atualizado: linhas.reduce((a, r) => (r.atualizado_em > a ? r.atualizado_em : a), '') || null};
     dash._carregar(conj);
   }
   const hojeBR = () => new Intl.DateTimeFormat('en-CA', {timeZone: 'America/Sao_Paulo'}).format(new Date());
@@ -753,6 +819,14 @@ if (named && named.dataset && named.dataset.pg) { page = named.dataset.pg; tabs(
     const corpo = document.getElementById('mu-lista');
     try {
       const {usuarios} = await servicoUsuarios('listar');
+      // Vínculo login -> nome do analista na WebDec (para a produtividade). Nomes possíveis:
+      // os que apareceram no gráfico de produtividade nos últimos 60 dias.
+      const desde = new Date(Date.now() - 60 * 86400000).toISOString().slice(0, 10);
+      const [{data: vinc}, {data: vistos}] = await Promise.all([
+        sb.from('usuarios_webdec').select('email,analista'),
+        sb.from('produtividade').select('analista').gte('dia', desde).limit(5000)]);
+      const vinculo = Object.fromEntries((vinc || []).map((v) => [v.email, v.analista]));
+      const nomesWebdec = [...new Set([...(vistos || []).map((v) => v.analista), ...Object.values(vinculo)])].sort((a, b) => a.localeCompare(b, 'pt-BR'));
       const adm = usuarios.filter((u) => u.administrador).length;
       document.getElementById('mu-n').textContent = '· ' + usuarios.length + (usuarios.length === 1 ? ' pessoa' : ' pessoas') +
         ' (' + adm + (adm === 1 ? ' administrador' : ' administradores') + ')';
@@ -775,6 +849,24 @@ if (named && named.dataset && named.dataset.pg) { page = named.dataset.pg; tabs(
           catch (err) { erroU.textContent = err.message; listarUsuarios(); }
         });
         tdP.append(sel);
+        const tdW = document.createElement('td');
+        const selW = document.createElement('select');
+        selW.setAttribute('aria-label', 'Nome na WebDec de ' + u.email);
+        selW.append(new Option('— sem vínculo —', ''), ...nomesWebdec.map((n) => new Option(n, n)));
+        const atual = vinculo[(u.email || '').toLowerCase()] || '';
+        selW.value = atual;
+        selW.addEventListener('change', async () => {
+          erroU.textContent = '';
+          const email = (u.email || '').toLowerCase();
+          const {data: eu} = await sb.auth.getUser();
+          const {error} = selW.value
+            ? await sb.from('usuarios_webdec').upsert({email, analista: selW.value, vinculado_por: (eu.user?.email || '').toLowerCase(), vinculado_em: new Date().toISOString()}, {onConflict: 'email'})
+            : await sb.from('usuarios_webdec').delete().eq('email', email);
+          if (error) { erroU.textContent = 'Não foi possível salvar o vínculo: ' + error.message; selW.value = atual; return; }
+          avisar(selW.value ? u.email + ' agora é ' + selW.value + ' na produtividade.' : 'Vínculo de ' + u.email + ' removido.');
+          listarUsuarios();
+        });
+        tdW.append(selW);
         const tdC = document.createElement('td'); tdC.textContent = quando(u.criado_em);
         const td2 = document.createElement('td'); td2.textContent = quando(u.ultimo_acesso);
         const td3 = document.createElement('td');
@@ -792,7 +884,7 @@ if (named && named.dataset && named.dataset.pg) { page = named.dataset.pg; tabs(
           catch (err) { erroU.textContent = err.message; }
         });
         td3.append(bNova, bRem);
-        tr.append(td1, tdP, tdC, td2, td3);
+        tr.append(td1, tdP, tdW, tdC, td2, td3);
         return tr;
       }));
     } catch (err) { erroU.textContent = err.message; }
