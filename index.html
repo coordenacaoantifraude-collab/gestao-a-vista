@@ -301,7 +301,7 @@ font-family:'Sora',sans-serif;font-size:.9375rem;line-height:1.5;color:var(--fg)
     <div class="gv-panel">
       <div class="gv-sec"><h2 id="sec-import">Importação das bases</h2><span>Todo banco precisa ser importado em até 1 h. A hora vem da última carga de hoje no sistema; sem lote hoje conta como fora do prazo.</span></div>
       <div class="gv-import" id="gv-import"></div>
-      <p class="gv-note" style="margin-top:.6rem">Banco sem operação para importar hoje: um administrador clica em "Marcar sem operação hoje" no cartão do banco. Ele sai dos alertas, da contagem e da mensagem do WhatsApp até o fim do dia; se chegar um lote, volta a ser cobrado.</p>
+      <p class="gv-note" style="margin-top:.6rem">Conferiu o banco e não havia operação para importar? Um administrador clica em "Conferido: sem operação" no cartão. O prazo de 60 min recomeça dessa hora, no painel e na mensagem do WhatsApp; passada 1 h sem carga nem nova conferência, o banco volta a ficar fora do prazo.</p>
     </div>
     <div class="gv-panel">
       <div class="gv-sec"><h2 id="sec-caixas">Mesa de crédito por caixa</h2><span>SLA de 180 min contado desde a última atuação, só em horário útil (segunda a sexta, 9h às 18h). Agendadas valem pelo horário da ligação.</span></div>
@@ -369,21 +369,28 @@ dash.calc('importacao', {
   description: 'Minutos desde a última carga de cada banco, até a hora da foto. Passou de 60 min está fora do prazo; sem lote hoje fica à parte.',
   inputs: ['bancos', 'status', 'sem_operacao'],
   fn: (bancos, status, marcados) => {
-    const ord = {'Fora do prazo': 0, 'Sem carga hoje': 1, 'No prazo': 2, 'Sem operação hoje': 3};
+    // "Sem operação" = alguém conferiu o banco e não havia o que importar. A conferência conta como
+    // uma carga: o prazo de 60 min recomeça dela (mesma regra do robô, em robo/alertas.py).
+    const ord = {'Fora do prazo': 0, 'Sem carga hoje': 1, 'No prazo': 2, 'Sem operação': 3};
     const norm = (s) => String(s).normalize('NFD').replace(/[̀-ͯ]/g, '').trim().toLowerCase();
+    const agora = Math.max(new Date(status[0].atualizado_em).getTime(), Date.now());
     return bancos.map((b) => {
-      const sem = !b.ultima_importacao;
-      const marca = sem ? (marcados || []).find((x) => norm(x.banco) === norm(b.banco)) : null;
-      const minutos = sem ? null : Math.round((new Date(status[0].atualizado_em) - new Date(b.ultima_importacao)) / 60000);
-      return {banco: b.banco, prazo: marca ? 'Sem operação hoje' : sem ? 'Sem carga hoje' : minutos <= status[0].prazo_import_min ? 'No prazo' : 'Fora do prazo', ultima_importacao: b.ultima_importacao, minutos, lote_novas: b.lote_novas, origem: b.origem, obs: b.obs, marcado_por: marca ? marca.marcado_por : '', marcado_em: marca ? marca.marcado_em : ''};
+      const marca = (marcados || []).find((x) => norm(x.banco) === norm(b.banco));
+      const carga = b.ultima_importacao ? new Date(b.ultima_importacao).getTime() : null;
+      const conf = marca ? new Date(marca.marcado_em).getTime() : null;
+      const usaConf = conf != null && (carga == null || conf > carga);
+      const base = usaConf ? conf : carga;
+      const minutos = base == null ? null : Math.max(0, Math.round(((usaConf ? agora : new Date(status[0].atualizado_em).getTime()) - base) / 60000));
+      const prazo = base == null ? 'Sem carga hoje' : minutos > status[0].prazo_import_min ? 'Fora do prazo' : usaConf ? 'Sem operação' : 'No prazo';
+      return {banco: b.banco, prazo, ultima_importacao: b.ultima_importacao, minutos, lote_novas: b.lote_novas, origem: b.origem, obs: b.obs, conferido: usaConf, marcado_por: usaConf ? marca.marcado_por : '', marcado_em: usaConf ? marca.marcado_em : ''};
     }).sort((a, b) => ord[a.prazo] - ord[b.prazo] || (b.minutos - a.minutos));
   }
 });
 dash.calc('import_resumo', {
   title: 'Bases fora do prazo',
-  description: 'Bancos acompanhados, quantos estão fora do prazo de 1 h (inclui quem não teve lote hoje). Bancos marcados como sem operação hoje ficam de fora.',
+  description: 'Bancos acompanhados, quantos estão fora do prazo de 1 h (inclui quem não teve lote hoje). Banco conferido sem operação dentro da última hora conta como no prazo.',
   inputs: ['importacao'],
-  fn: (importacao) => { const l = importacao.filter((r) => r.prazo !== 'Sem operação hoje'); return [{total: l.length, fora: l.filter((r) => r.prazo !== 'No prazo').length}]; }
+  fn: (importacao) => [{total: importacao.length, fora: importacao.filter((r) => r.prazo === 'Fora do prazo' || r.prazo === 'Sem carga hoje').length}]
 });
 dash.calc('sla_dia', {
   title: 'SLA do dia por situação',
@@ -453,7 +460,7 @@ dash.calc('alertas', {
   fn: (importacao, fila) => {
     const hm = (iso) => new Date(iso).toLocaleTimeString('pt-BR', {hour: '2-digit', minute: '2-digit', timeZone: 'America/Sao_Paulo'});
     const out = [];
-    importacao.filter((b) => b.prazo === 'Fora do prazo').forEach((b) => out.push({severidade: b.minutos >= 180 ? 'critico' : 'atencao', titulo: 'Importação fora do prazo: ' + b.banco, detalhe: 'Última carga às ' + hm(b.ultima_importacao) + ', há ' + b.minutos + ' min. O limite é 60 min.'}));
+    importacao.filter((b) => b.prazo === 'Fora do prazo').forEach((b) => out.push({severidade: b.minutos >= 180 ? 'critico' : 'atencao', titulo: 'Importação fora do prazo: ' + b.banco, detalhe: (b.conferido ? 'Conferido sem operação às ' + hm(b.marcado_em) : 'Última carga às ' + hm(b.ultima_importacao)) + ', há ' + b.minutos + ' min. O limite é 60 min.'}));
     importacao.filter((b) => b.prazo === 'Sem carga hoje').forEach((b) => out.push({severidade: 'critico', titulo: 'Sem lote hoje: ' + b.banco, detalhe: 'Nenhuma importação registrada hoje. O limite é 60 min entre cargas.'}));
     importacao.filter((b) => /credenciais/i.test(b.obs)).forEach((b) => out.push({severidade: 'critico', titulo: 'Robô sem credencial: ' + b.banco, detalhe: b.obs + '.'}));
     fila.filter((p) => p.situacao === 'SLA estourado').forEach((p) => out.push({severidade: 'critico', titulo: 'SLA estourado: ADE ' + p.ade, detalhe: p.banco + ' · ' + p.caixa + ' · sem atuação há ' + p.sem_atuacao + ' min em horário útil (limite 180).'}));
@@ -507,33 +514,34 @@ function slatabelas(st, fx, bk) {
   const box = $('#gv-sla-faixas'); box.replaceChildren(); const mx = Math.max(0, ...fx.map((d) => d.qtd)) || 1;
   fx.forEach((d, i) => { const row = h('div', 'gv-hrow'); row.append(h('span', null, d.faixa)); const tr = h('div', 'tr'); const f = h('i', ''); f.style.width = (d.qtd / mx * 100) + '%'; tr.append(f); row.append(tr, h('span', 'vv', NF.format(d.qtd))); box.append(row); });
 }
-// Botão "Sem operação hoje": só administradores; a marcação vale só para hoje e some se o banco
-// receber lote. Quem grava é window.gvMarcar (definido no script de login, abaixo).
+// Botão "Sem operação": só administradores. Marca que o banco foi conferido agora e não havia
+// operação para importar; o prazo de 60 min recomeça dessa hora. Grava via window.gvMarcar.
 function botaoSemOperacao(r) {
-  if (!window.gvAdmin || (r.prazo !== 'Sem carga hoje' && r.prazo !== 'Sem operação hoje')) return null;
-  const marcar = r.prazo === 'Sem carga hoje';
-  const b = h('button', 'gv-semop', marcar ? 'Marcar sem operação hoje' : 'Desfazer');
+  if (!window.gvAdmin || r.prazo === 'No prazo') return null;
+  const marcar = r.prazo !== 'Sem operação';
+  const rotulo = marcar ? 'Conferido: sem operação' : 'Desfazer';
+  const b = h('button', 'gv-semop', rotulo);
   b.type = 'button';
-  b.title = marcar ? 'O banco não tem operação para importar hoje: sai dos alertas e da contagem de fora do prazo até amanhã.' : 'Volta a cobrar o lote deste banco hoje.';
+  b.title = marcar ? 'Conferi agora e não há operação para importar: o prazo de 60 min recomeça desta hora.' : 'Apaga a conferência; o banco volta a contar da última carga.';
   b.addEventListener('click', async () => {
-    if (marcar && !confirm('Marcar ' + r.banco + ' como sem operação para importar hoje?\n\nEle sai dos alertas até amanhã (ou até chegar um lote).')) return;
+    if (marcar && !confirm('Registrar que ' + r.banco + ' foi conferido agora e não tem operação para importar?\n\nO prazo de 60 min recomeça agora.')) return;
     b.disabled = true; b.textContent = 'Salvando…';
     const erro = await window.gvMarcar(r.banco, marcar);
-    if (erro) { alert('Não foi possível salvar: ' + erro); b.disabled = false; b.textContent = marcar ? 'Marcar sem operação hoje' : 'Desfazer'; }
+    if (erro) { alert('Não foi possível salvar: ' + erro); b.disabled = false; b.textContent = rotulo; }
   });
   return b;
 }
-function quemMarcou(r) { return 'Marcado por ' + (r.marcado_por || '—') + ' às ' + hhmm(r.marcado_em) + '. Vale só para hoje.'; }
+function quemMarcou(r) { return 'Conferido sem operação às ' + hhmm(r.marcado_em) + ' por ' + (r.marcado_por || '—'); }
 function importacao(rows) {
   const box = $('#gv-import'); box.replaceChildren();
   rows.forEach((r) => {
-    const w = 'banco=' + r.banco, semop = r.prazo === 'Sem operação hoje', fora = r.prazo !== 'No prazo' && !semop, sem = r.minutos == null;
+    const w = 'banco=' + r.banco, semop = r.prazo === 'Sem operação', fora = r.prazo === 'Fora do prazo' || r.prazo === 'Sem carga hoje', sem = r.minutos == null;
     const c = h('div', 'gv-imp' + (fora ? ' bad' : r.obs ? ' warn' : '') + (semop ? ' semop' : ''));
     const r1 = h('div', 'r'); r1.append(m(h('b', null, r.banco), 'importacao', 'banco', w));
-    const tag = h('span', 'gv-tag'); tag.append(h('i', 'gv-dot ' + (semop ? '' : fora ? 'bad' : 'ok')), document.createTextNode(' '), m(h('span', null, r.prazo), 'importacao', 'prazo', w)); r1.append(tag);
-    const big = h('div', 'big'); if (semop) big.textContent = 'Sem operação'; else if (sem) big.textContent = 'Sem lote hoje'; else big.append(document.createTextNode('há '), m(h('span', null, String(r.minutos)), 'importacao', 'minutos', w), document.createTextNode(' min'));
-    const bar = h('div', 'gv-bar'); const f = h('i', semop ? '' : fora ? 'bad' : r.minutos >= 45 ? 'warn' : ''); f.style.width = semop ? '0%' : sem ? '100%' : Math.min(100, Math.max(3, r.minutos / 60 * 100)) + '%'; bar.append(f);
-    const r3 = h('div', 'r gv-mute'); r3.append(h('span', null, semop ? quemMarcou(r) : sem ? 'Nenhuma carga registrada' : 'Última carga ' + hhmm(r.ultima_importacao)), h('span', null, r.origem));
+    const tag = h('span', 'gv-tag'); tag.append(h('i', 'gv-dot ' + (fora ? 'bad' : 'ok')), document.createTextNode(' '), m(h('span', null, r.prazo), 'importacao', 'prazo', w)); r1.append(tag);
+    const big = h('div', 'big'); if (sem) big.textContent = 'Sem lote hoje'; else big.append(document.createTextNode('há '), m(h('span', null, String(r.minutos)), 'importacao', 'minutos', w), document.createTextNode(' min'));
+    const bar = h('div', 'gv-bar'); const f = h('i', fora ? 'bad' : r.minutos >= 45 ? 'warn' : ''); f.style.width = sem ? '100%' : Math.min(100, Math.max(3, r.minutos / 60 * 100)) + '%'; bar.append(f);
+    const r3 = h('div', 'r gv-mute'); r3.append(h('span', null, r.conferido ? quemMarcou(r) : sem ? 'Nenhuma carga registrada' : 'Última carga ' + hhmm(r.ultima_importacao)), h('span', null, r.origem));
     c.append(r1, big, bar, r3);
     if (r.obs) c.append(m(h('div', 'gv-note', r.obs), 'importacao', 'obs', w));
     const bt = botaoSemOperacao(r); if (bt) c.append(bt);
@@ -586,9 +594,9 @@ function bancos(rows) {
   const tb = $('#gv-bancos tbody'); tb.replaceChildren();
   rows.forEach((r) => {
     const tr = document.createElement('tr'); tr.dataset.key = r.banco;
-    const st = h('td'); st.append(h('i', 'gv-dot ' + (r.prazo === 'No prazo' ? 'ok' : r.prazo === 'Fora do prazo' || r.prazo === 'Sem carga hoje' ? 'bad' : '')), document.createTextNode(' ' + r.prazo));
+    const st = h('td'); st.append(h('i', 'gv-dot ' + (r.prazo === 'No prazo' || r.prazo === 'Sem operação' ? 'ok' : r.prazo === 'Fora do prazo' || r.prazo === 'Sem carga hoje' ? 'bad' : '')), document.createTextNode(' ' + r.prazo));
     const bt = botaoSemOperacao(r); if (bt) { st.append(document.createElement('br'), bt); }
-    const obs = [r.obs, r.prazo === 'Sem operação hoje' ? quemMarcou(r) : ''].filter(Boolean).join(' ');
+    const obs = [r.obs, r.conferido ? quemMarcou(r) + '.' : ''].filter(Boolean).join(' ');
     tr.append(h('td', '', r.banco), st, h('td', '', hhmm(r.ultima_importacao)), h('td', 'n', r.minutos == null ? '—' : r.minutos + ' min'), h('td', 'n', r.minutos == null ? '—' : NF.format(r.lote_novas)), h('td', '', r.origem || '—'), h('td', '', obs || '—'));
     tb.append(tr);
   });
@@ -668,9 +676,9 @@ if (named && named.dataset && named.dataset.pg) { page = named.dataset.pg; tabs(
   const hojeBR = () => new Intl.DateTimeFormat('en-CA', {timeZone: 'America/Sao_Paulo'}).format(new Date());
   window.gvMarcar = async (banco, marcar) => {
     const {error} = marcar
-      ? await sb.from('bancos_sem_operacao').insert({banco, dia: hojeBR(), marcado_por: ((await sb.auth.getUser()).data.user?.email || '').toLowerCase()})
+      ? await sb.from('bancos_sem_operacao').upsert({banco, dia: hojeBR(), marcado_em: new Date().toISOString(), marcado_por: ((await sb.auth.getUser()).data.user?.email || '').toLowerCase()}, {onConflict: 'dia,banco'})
       : await sb.from('bancos_sem_operacao').delete().eq('dia', hojeBR()).eq('banco', banco);
-    if (error && !/duplicate/i.test(error.message)) return error.message;
+    if (error) return error.message;
     await carregar();
     return null;
   };
