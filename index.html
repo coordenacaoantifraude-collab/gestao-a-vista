@@ -301,7 +301,7 @@ font-family:'Sora',sans-serif;font-size:.9375rem;line-height:1.5;color:var(--fg)
     <div class="gv-panel">
       <div class="gv-sec"><h2 id="sec-import">Importação das bases</h2><span>Todo banco precisa ser importado em até 1 h. A hora vem da última carga de hoje no sistema; sem lote hoje conta como fora do prazo.</span></div>
       <div class="gv-import" id="gv-import"></div>
-      <p class="gv-note" style="margin-top:.6rem">Conferiu o banco e não havia operação para importar? Um administrador clica em "Conferido: sem operação" no cartão. O prazo de 60 min recomeça dessa hora, no painel e na mensagem do WhatsApp; passada 1 h sem carga nem nova conferência, o banco volta a ficar fora do prazo.</p>
+      <p class="gv-note" style="margin-top:.6rem">Conferiu o banco e não havia operação para importar? Clique em "Conferido: sem operação" no cartão. O prazo de 60 min recomeça dessa hora, no painel e na mensagem do WhatsApp; passada 1 h sem carga nem nova conferência, o banco volta a ficar fora do prazo.</p>
     </div>
     <div class="gv-panel">
       <div class="gv-sec"><h2 id="sec-caixas">Mesa de crédito por caixa</h2><span>SLA de 180 min contado desde a última atuação, só em horário útil (segunda a sexta, 9h às 18h). Agendadas valem pelo horário da ligação.</span></div>
@@ -514,10 +514,11 @@ function slatabelas(st, fx, bk) {
   const box = $('#gv-sla-faixas'); box.replaceChildren(); const mx = Math.max(0, ...fx.map((d) => d.qtd)) || 1;
   fx.forEach((d, i) => { const row = h('div', 'gv-hrow'); row.append(h('span', null, d.faixa)); const tr = h('div', 'tr'); const f = h('i', ''); f.style.width = (d.qtd / mx * 100) + '%'; tr.append(f); row.append(tr, h('span', 'vv', NF.format(d.qtd))); box.append(row); });
 }
-// Botão "Sem operação": só administradores. Marca que o banco foi conferido agora e não havia
-// operação para importar; o prazo de 60 min recomeça dessa hora. Grava via window.gvMarcar.
+// Botão "Sem operação": qualquer pessoa logada (administrador ou operacional). Marca que o banco
+// foi conferido agora e não havia operação para importar; o prazo de 60 min recomeça dessa hora.
+// Grava via window.gvMarcar.
 function botaoSemOperacao(r) {
-  if (!window.gvAdmin || r.prazo === 'No prazo') return null;
+  if (!window.gvMarcar || r.prazo === 'No prazo') return null;
   const marcar = r.prazo !== 'Sem operação';
   const rotulo = marcar ? 'Conferido: sem operação' : 'Desfazer';
   const b = h('button', 'gv-semop', rotulo);
