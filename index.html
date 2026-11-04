@@ -90,6 +90,8 @@ body.em-usuarios .gv{display:none}
       <h2>Cadastrar pessoa</h2>
       <form id="mu-form">
         <input id="mu-email" type="email" placeholder="E-mail da pessoa" aria-label="E-mail da pessoa" required>
+        <input id="mu-nome" list="mu-nomes" placeholder="Nome na WebDec (como aparece na produtividade)" aria-label="Nome da pessoa na WebDec" autocomplete="off">
+        <datalist id="mu-nomes"></datalist>
         <select id="mu-perfil" aria-label="Perfil">
           <option value="operacional">Operacional</option>
           <option value="administrador">Administrador</option>
@@ -675,7 +677,8 @@ function produtividade(p) {
   $('#gv-prod-hora').textContent = p.atualizado ? 'Atualizado às ' + hhmm(p.atualizado) : 'Ainda sem leitura hoje';
   if (p.meu) {
     $('#gv-prod-eu-nome').textContent = p.meu;
-    const meus = Object.fromEntries(p.linhas.filter((r) => r.analista === p.meu).map((r) => [r.acao, r.qtd]));
+    const nn = (s) => String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/\s+/g, ' ').trim().toLowerCase();
+    const meus = Object.fromEntries(p.linhas.filter((r) => nn(r.analista) === nn(p.meu)).map((r) => [r.acao, r.qtd]));
     cartoes(eu, (x) => meus[x]);
   } else {
     $('#gv-prod-eu-nome').textContent = '';
@@ -815,6 +818,24 @@ if (named && named.dataset && named.dataset.pg) { page = named.dataset.pg; tabs(
   }
   const okU = document.getElementById('mu-ok');
   const avisar = (texto) => { okU.textContent = texto; setTimeout(() => { if (okU.textContent === texto) okU.textContent = ''; }, 4000); };
+  // Nome da pessoa na WebDec (liga o login à linha dela na produtividade). Se o nome digitado
+  // for igual a um já visto no gráfico (ignorando maiúsculas, acentos e espaços), usa a grafia
+  // da WebDec. Nome vazio apaga o vínculo. Devolve a mensagem de erro, ou null.
+  let nomesConhecidos = [];
+  const normNome = (s) => String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/\s+/g, ' ').trim().toLowerCase();
+  async function salvarNome(emailBruto, nomeBruto) {
+    const email = String(emailBruto || '').trim().toLowerCase();
+    const digitado = String(nomeBruto || '').replace(/\s+/g, ' ').trim();
+    if (!digitado) {
+      const {error} = await sb.from('usuarios_webdec').delete().eq('email', email);
+      return error ? error.message : null;
+    }
+    const analista = nomesConhecidos.find((n) => normNome(n) === normNome(digitado)) || digitado;
+    const {data: eu} = await sb.auth.getUser();
+    const {error} = await sb.from('usuarios_webdec').upsert({email, analista,
+      vinculado_por: (eu.user?.email || '').toLowerCase(), vinculado_em: new Date().toISOString()}, {onConflict: 'email'});
+    return error ? error.message : null;
+  }
   async function listarUsuarios() {
     const corpo = document.getElementById('mu-lista');
     try {
@@ -827,6 +848,8 @@ if (named && named.dataset && named.dataset.pg) { page = named.dataset.pg; tabs(
         sb.from('produtividade').select('analista').gte('dia', desde).limit(5000)]);
       const vinculo = Object.fromEntries((vinc || []).map((v) => [v.email, v.analista]));
       const nomesWebdec = [...new Set([...(vistos || []).map((v) => v.analista), ...Object.values(vinculo)])].sort((a, b) => a.localeCompare(b, 'pt-BR'));
+      nomesConhecidos = nomesWebdec;
+      document.getElementById('mu-nomes').replaceChildren(...nomesWebdec.map((n) => new Option(n, n)));
       const adm = usuarios.filter((u) => u.administrador).length;
       document.getElementById('mu-n').textContent = '· ' + usuarios.length + (usuarios.length === 1 ? ' pessoa' : ' pessoas') +
         ' (' + adm + (adm === 1 ? ' administrador' : ' administradores') + ')';
@@ -850,23 +873,20 @@ if (named && named.dataset && named.dataset.pg) { page = named.dataset.pg; tabs(
         });
         tdP.append(sel);
         const tdW = document.createElement('td');
-        const selW = document.createElement('select');
-        selW.setAttribute('aria-label', 'Nome na WebDec de ' + u.email);
-        selW.append(new Option('— sem vínculo —', ''), ...nomesWebdec.map((n) => new Option(n, n)));
+        const inW = document.createElement('input');
+        inW.setAttribute('list', 'mu-nomes'); inW.autocomplete = 'off';
+        inW.placeholder = 'Nome na WebDec'; inW.style.minWidth = '12rem';
+        inW.setAttribute('aria-label', 'Nome na WebDec de ' + u.email);
         const atual = vinculo[(u.email || '').toLowerCase()] || '';
-        selW.value = atual;
-        selW.addEventListener('change', async () => {
+        inW.value = atual;
+        inW.addEventListener('change', async () => {
           erroU.textContent = '';
-          const email = (u.email || '').toLowerCase();
-          const {data: eu} = await sb.auth.getUser();
-          const {error} = selW.value
-            ? await sb.from('usuarios_webdec').upsert({email, analista: selW.value, vinculado_por: (eu.user?.email || '').toLowerCase(), vinculado_em: new Date().toISOString()}, {onConflict: 'email'})
-            : await sb.from('usuarios_webdec').delete().eq('email', email);
-          if (error) { erroU.textContent = 'Não foi possível salvar o vínculo: ' + error.message; selW.value = atual; return; }
-          avisar(selW.value ? u.email + ' agora é ' + selW.value + ' na produtividade.' : 'Vínculo de ' + u.email + ' removido.');
+          const erro = await salvarNome(u.email, inW.value);
+          if (erro) { erroU.textContent = 'Não foi possível salvar o nome: ' + erro; inW.value = atual; return; }
+          avisar(inW.value.trim() ? 'Nome de ' + u.email + ' salvo.' : 'Nome de ' + u.email + ' removido.');
           listarUsuarios();
         });
-        tdW.append(selW);
+        tdW.append(inW);
         const tdC = document.createElement('td'); tdC.textContent = quando(u.criado_em);
         const td2 = document.createElement('td'); td2.textContent = quando(u.ultimo_acesso);
         const td3 = document.createElement('td');
@@ -914,11 +934,15 @@ if (named && named.dataset && named.dataset.pg) { page = named.dataset.pg; tabs(
   document.getElementById('mu-form').addEventListener('submit', async (e) => {
     e.preventDefault();
     erroU.textContent = ''; document.getElementById('mu-senha').hidden = true;
-    const campo = document.getElementById('mu-email'), perfil = document.getElementById('mu-perfil');
+    const campo = document.getElementById('mu-email'), perfil = document.getElementById('mu-perfil'), nome = document.getElementById('mu-nome');
     try {
       const r = await servicoUsuarios('criar', {email: campo.value, perfil: perfil.value});
       mostrarSenha('Acesso criado para ' + r.email + ' (' + (r.perfil === 'administrador' ? 'Administrador' : 'Operacional') + '). Senha inicial:', r.senha);
-      campo.value = ''; perfil.value = 'operacional';
+      if (nome.value.trim()) {
+        const erroNome = await salvarNome(r.email || campo.value, nome.value);
+        if (erroNome) erroU.textContent = 'Acesso criado, mas o nome na WebDec não foi salvo: ' + erroNome + '. Ajuste na lista abaixo.';
+      }
+      campo.value = ''; nome.value = ''; perfil.value = 'operacional';
       listarUsuarios();
     } catch (err) { erroU.textContent = err.message; }
   });
