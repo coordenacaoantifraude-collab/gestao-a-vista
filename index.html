@@ -90,7 +90,7 @@ body.em-usuarios .gv{display:none}
       <h2>Cadastrar pessoa</h2>
       <form id="mu-form">
         <input id="mu-email" type="email" placeholder="E-mail da pessoa" aria-label="E-mail da pessoa" required>
-        <input id="mu-nome" list="mu-nomes" placeholder="Nome na WebDec (como aparece na produtividade)" aria-label="Nome da pessoa na WebDec" autocomplete="off">
+        <input id="mu-nome" list="mu-nomes" placeholder="Usuário na WebDec (ex.: rafaela.silva)" aria-label="Usuário da pessoa na WebDec" autocomplete="off">
         <datalist id="mu-nomes"></datalist>
         <select id="mu-perfil" aria-label="Perfil">
           <option value="operacional">Operacional</option>
@@ -110,7 +110,7 @@ body.em-usuarios .gv{display:none}
     <section class="pu-card">
       <h2>Quem tem acesso <span class="pu-n" id="mu-n"></span></h2>
       <div class="pu-scroll">
-        <table class="md-t"><thead><tr><th>E-mail</th><th>Perfil</th><th>Nome na WebDec</th><th>Cadastro</th><th>Último acesso</th><th></th></tr></thead><tbody id="mu-lista"></tbody></table>
+        <table class="md-t"><thead><tr><th>E-mail</th><th>Perfil</th><th>Usuário na WebDec</th><th>Cadastro</th><th>Último acesso</th><th></th></tr></thead><tbody id="mu-lista"></tbody></table>
       </div>
     </section>
   </div>
@@ -358,7 +358,7 @@ font-family:'Sora',sans-serif;font-size:.9375rem;line-height:1.5;color:var(--fg)
       <div class="gv-sec"><h2 id="sec-prod-todos">Por analista</h2><span>Visível só para administradores</span></div>
       <div class="gv-scroll"><table id="gv-prod-todos"><thead></thead><tbody></tbody></table></div>
     </div>
-    <p class="gv-note">Números do gráfico "Produtividade por Ação" do BI Antifraude da WebDec, só do dia de hoje, atualizados pelo robô a cada 15 minutos. Cada pessoa vê a própria quantidade e o total da equipe; os nomes dos outros analistas só aparecem para administradores.</p>
+    <p class="gv-note">Contagem do Analítico de "Produtividade por Ação" do BI Antifraude da WebDec (uma linha por ação), só do dia de hoje, atualizada pelo robô a cada 15 minutos. Cada pessoa vê a própria quantidade e o total da equipe; os usuários dos outros só aparecem para administradores.</p>
   </section>
 
   <section id="pg-propostas" aria-labelledby="tab-propostas" hidden style="display:flex;flex-direction:column;gap:1rem">
@@ -662,7 +662,7 @@ function render() {
 
 // Produtividade: vem de window.gvProd (carregado no script de login). O banco de dados já filtra:
 // operacional recebe só a própria linha em "linhas"; o total vem somado, sem nomes.
-const ACOES_PROD = ['Aprovações', 'Reprovações', 'Agendamentos', 'Pendências', 'Analise Documental'];
+const ACOES_PROD = ['Aprovada', 'Reprovada', 'Pendenciada', 'Análise documento', 'Agendada', 'Mapeada', 'Aguardando banco'];
 function produtividade(p) {
   const tot = $('#gv-prod-total'), eu = $('#gv-prod-eu');
   if (!p) { tot.replaceChildren(h('div', 'gv-note', 'Carregando…')); return; }
@@ -683,15 +683,15 @@ function produtividade(p) {
   } else {
     $('#gv-prod-eu-nome').textContent = '';
     eu.replaceChildren(h('div', 'gv-note', p.admin
-      ? 'Seu login não está ligado a um nome da WebDec. Ligue em Usuários > Nome na WebDec.'
-      : 'Seu login ainda não está ligado ao seu nome na WebDec. Peça a um administrador para fazer o vínculo.'));
+      ? 'Seu login não está ligado a um usuário da WebDec. Ligue em Usuários > Usuário na WebDec.'
+      : 'Seu login ainda não está ligado ao seu usuário da WebDec. Peça a um administrador para fazer o vínculo.'));
   }
   const box = $('#gv-prod-todos-box'); box.hidden = !p.admin;
   if (p.admin) {
     const nomes = [...new Set(p.linhas.map((r) => r.analista))];
     const q = (n, x) => (p.linhas.find((r) => r.analista === n && r.acao === x) || {}).qtd || 0;
     const linhas = nomes.map((n) => ({n, por: acoes.map((x) => q(n, x)), tot: acoes.reduce((a, x) => a + q(n, x), 0)})).sort((a, b) => b.tot - a.tot);
-    const th = document.createElement('tr'); th.append(h('th', '', 'Analista'), ...acoes.map((x) => h('th', 'n', x)), h('th', 'n', 'Total'));
+    const th = document.createElement('tr'); th.append(h('th', '', 'Usuário na WebDec'), ...acoes.map((x) => h('th', 'n', x)), h('th', 'n', 'Total'));
     $('#gv-prod-todos thead').replaceChildren(th);
     const tb = $('#gv-prod-todos tbody'); tb.replaceChildren();
     if (!linhas.length) { const tr = document.createElement('tr'); const td = h('td', '', 'Nenhuma ação registrada hoje.'); td.colSpan = acoes.length + 2; tr.append(td); tb.append(tr); }
@@ -875,15 +875,15 @@ if (named && named.dataset && named.dataset.pg) { page = named.dataset.pg; tabs(
         const tdW = document.createElement('td');
         const inW = document.createElement('input');
         inW.setAttribute('list', 'mu-nomes'); inW.autocomplete = 'off';
-        inW.placeholder = 'Nome na WebDec'; inW.style.minWidth = '12rem';
-        inW.setAttribute('aria-label', 'Nome na WebDec de ' + u.email);
+        inW.placeholder = 'Usuário na WebDec'; inW.style.minWidth = '12rem';
+        inW.setAttribute('aria-label', 'Usuário na WebDec de ' + u.email);
         const atual = vinculo[(u.email || '').toLowerCase()] || '';
         inW.value = atual;
         inW.addEventListener('change', async () => {
           erroU.textContent = '';
           const erro = await salvarNome(u.email, inW.value);
-          if (erro) { erroU.textContent = 'Não foi possível salvar o nome: ' + erro; inW.value = atual; return; }
-          avisar(inW.value.trim() ? 'Nome de ' + u.email + ' salvo.' : 'Nome de ' + u.email + ' removido.');
+          if (erro) { erroU.textContent = 'Não foi possível salvar o usuário da WebDec: ' + erro; inW.value = atual; return; }
+          avisar(inW.value.trim() ? 'Usuário da WebDec de ' + u.email + ' salvo.' : 'Usuário da WebDec de ' + u.email + ' removido.');
           listarUsuarios();
         });
         tdW.append(inW);
@@ -940,7 +940,7 @@ if (named && named.dataset && named.dataset.pg) { page = named.dataset.pg; tabs(
       mostrarSenha('Acesso criado para ' + r.email + ' (' + (r.perfil === 'administrador' ? 'Administrador' : 'Operacional') + '). Senha inicial:', r.senha);
       if (nome.value.trim()) {
         const erroNome = await salvarNome(r.email || campo.value, nome.value);
-        if (erroNome) erroU.textContent = 'Acesso criado, mas o nome na WebDec não foi salvo: ' + erroNome + '. Ajuste na lista abaixo.';
+        if (erroNome) erroU.textContent = 'Acesso criado, mas o usuário na WebDec não foi salvo: ' + erroNome + '. Ajuste na lista abaixo.';
       }
       campo.value = ''; nome.value = ''; perfil.value = 'operacional';
       listarUsuarios();
