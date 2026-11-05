@@ -59,6 +59,9 @@ body.em-usuarios .gv{display:none}
 .gv-periodo button{font:600 .75rem 'Sora',sans-serif;padding:.3rem .8rem;border:0;background:transparent;color:inherit;cursor:pointer}
 .gv-periodo button[aria-pressed="true"]{background:#3D7BFF;color:#fff}
 .gv-note:empty{display:none}
+.gv-prod-data{display:inline-flex;align-items:center;gap:.35rem;font:600 .75rem 'Sora',sans-serif}
+.gv-prod-data input{font:inherit;font-weight:400;padding:.25rem .5rem;border-radius:.5rem;border:1px solid rgba(127,140,160,.45);background:transparent;color:inherit;color-scheme:light dark}
+.gv-prod-data.ativo input{border-color:#3D7BFF;box-shadow:0 0 0 1px #3D7BFF}
 .tag{font-size:.65rem;padding:.05rem .4rem;border-radius:999px;border:1px solid rgba(255,255,255,.25);margin-left:.3rem;color:rgba(242,245,250,.8)}
 </style>
 </head>
@@ -354,6 +357,7 @@ font-family:'Sora',sans-serif;font-size:.9375rem;line-height:1.5;color:var(--fg)
       <div class="gv-sec"><h2 id="sec-prod-total">Produtividade de hoje, equipe toda</h2>
         <span style="display:flex;gap:.6rem;align-items:center;flex-wrap:wrap">
           <span class="gv-periodo" id="gv-prod-periodo" role="group" aria-label="Período"><button type="button" data-p="dia" aria-pressed="true">Hoje</button><button type="button" data-p="semana" aria-pressed="false">Semana</button></span>
+          <label class="gv-prod-data">Data <input type="date" id="gv-prod-data" aria-label="Escolher uma data"></label>
           <span id="gv-prod-hora">—</span>
         </span></div>
       <p class="gv-note" id="gv-prod-periodo-nota" style="margin:-.4rem 0 .8rem"></p>
@@ -672,30 +676,50 @@ function render() {
 // Produtividade: vem de window.gvProd (carregado no script de login). O banco de dados já filtra:
 // operacional recebe só a própria linha em "linhas"; o total vem somado, sem nomes.
 const ACOES_PROD = ['Aprovada', 'Reprovada', 'Pendenciada', 'Análise documento', 'Agendada', 'Mapeada', 'Aguardando banco'];
-let periodoProd = 'dia';
+// Período: 'dia' (hoje), 'semana' (de segunda até hoje) ou 'data' (um dia escolhido no calendário,
+// buscado na hora por window.gvBuscarDia; o robô guarda os últimos 31 dias).
+let periodoProd = 'dia', dataProd = null;
 try { periodoProd = localStorage.getItem('gv-periodo-prod') === 'semana' ? 'semana' : 'dia'; } catch (e) {}
 document.querySelectorAll('#gv-prod-periodo button').forEach((b) => b.addEventListener('click', () => {
-  periodoProd = b.dataset.p; try { localStorage.setItem('gv-periodo-prod', periodoProd); } catch (e) {}
+  periodoProd = b.dataset.p; $('#gv-prod-data').value = '';
+  try { localStorage.setItem('gv-periodo-prod', periodoProd); } catch (e) {}
   render();
 }));
+$('#gv-prod-data').addEventListener('change', async (e) => {
+  const v = e.target.value;
+  if (!v) { periodoProd = 'dia'; render(); return; }
+  periodoProd = 'data'; dataProd = {dia: v, carregando: true};
+  render();
+  dataProd = await window.gvBuscarDia(v);
+  render();
+});
 function produtividade(bruto) {
   const tot = $('#gv-prod-total'), eu = $('#gv-prod-eu');
   if (!bruto) { tot.replaceChildren(h('div', 'gv-note', 'Carregando…')); return; }
-  const semana = periodoProd === 'semana';
+  if (periodoProd === 'data' && (!dataProd || dataProd.dia === bruto.hoje)) { periodoProd = 'dia'; $('#gv-prod-data').value = ''; }
+  const semana = periodoProd === 'semana', escolhida = periodoProd === 'data';
+  const cal = $('#gv-prod-data'); cal.max = bruto.hoje;
+  const d31 = new Date(bruto.hoje + 'T12:00:00Z'); d31.setUTCDate(d31.getUTCDate() - 31); cal.min = d31.toISOString().slice(0, 10);
   document.querySelectorAll('#gv-prod-periodo button').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.p === periodoProd)));
+  $('.gv-prod-data').classList.toggle('ativo', escolhida);
   const dm = (iso) => iso.slice(8, 10) + '/' + iso.slice(5, 7);
   const diasComDado = [...new Set(bruto.linhas.map((r) => r.dia))].sort();
-  $('#sec-prod-total').textContent = semana ? 'Produtividade da semana, equipe toda' : 'Produtividade de hoje, equipe toda';
-  $('#sec-prod-eu').textContent = semana ? 'Você na semana' : 'Você hoje';
+  $('#sec-prod-total').textContent = semana ? 'Produtividade da semana, equipe toda'
+    : escolhida ? 'Produtividade de ' + dm(dataProd.dia) + ', equipe toda' : 'Produtividade de hoje, equipe toda';
+  $('#sec-prod-eu').textContent = semana ? 'Você na semana' : escolhida ? 'Você em ' + dm(dataProd.dia) : 'Você hoje';
   $('#gv-prod-periodo-nota').textContent = semana
     ? 'De ' + dm(bruto.segunda) + ' a ' + dm(bruto.hoje) + (diasComDado.length ? ' · dias com leitura: ' + diasComDado.map(dm).join(', ') : '') + '. Dias anteriores são lidos completos pelo robô ao longo do dia seguinte.'
+    : escolhida ? (dataProd.carregando ? 'Buscando ' + dm(dataProd.dia) + '…'
+      : dataProd.erro ? 'Não foi possível buscar: ' + dataProd.erro
+      : dataProd.linhas.length || dataProd.total.length ? 'Dia ' + dm(dataProd.dia) + ' completo.'
+      : 'Sem ações em ' + dm(dataProd.dia) + ', ou o robô ainda não leu esse dia (ele guarda os últimos 31 dias e lê um dia anterior a cada 15 minutos).')
     : '';
   // Soma as linhas do período por usuário e ação.
   const soma = {};
-  bruto.linhas.filter((r) => semana || r.dia === bruto.hoje).forEach((r) => {
-    const k = r.analista + '\t' + r.acao; soma[k] = (soma[k] || 0) + r.qtd; });
+  const fonte = escolhida ? (dataProd.linhas || []) : bruto.linhas.filter((r) => semana || r.dia === bruto.hoje);
+  fonte.forEach((r) => { const k = r.analista + '\t' + r.acao; soma[k] = (soma[k] || 0) + r.qtd; });
   const p = {meu: bruto.meu, admin: bruto.admin, atualizado: bruto.atualizado,
-    total: semana ? bruto.totalSemana : bruto.totalDia,
+    total: semana ? bruto.totalSemana : escolhida ? (dataProd.total || []) : bruto.totalDia,
     linhas: Object.entries(soma).map(([k, qtd]) => { const [analista, acao] = k.split('\t'); return {analista, acao, qtd}; })};
   const acoes = [...new Set([...ACOES_PROD, ...p.total.map((r) => r.acao), ...p.linhas.map((r) => r.acao)])];
   const cartoes = (box, qtd) => {
@@ -705,7 +729,7 @@ function produtividade(bruto) {
   };
   const totMap = Object.fromEntries(p.total.map((r) => [r.acao, Number(r.qtd)]));
   cartoes(tot, (x) => totMap[x]);
-  $('#gv-prod-hora').textContent = p.atualizado ? 'Atualizado às ' + hhmm(p.atualizado) : 'Ainda sem leitura hoje';
+  $('#gv-prod-hora').textContent = escolhida ? '' : p.atualizado ? 'Atualizado às ' + hhmm(p.atualizado) : 'Ainda sem leitura hoje';
   if (p.meu) {
     $('#gv-prod-eu-nome').textContent = p.meu;
     const nn = (s) => String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/\s+/g, ' ').trim().toLowerCase();
@@ -781,6 +805,15 @@ if (named && named.dataset && named.dataset.pg) { page = named.dataset.pg; tabs(
     dash._carregar(conj);
   }
   const hojeBR = () => new Intl.DateTimeFormat('en-CA', {timeZone: 'America/Sao_Paulo'}).format(new Date());
+  // Produtividade de um dia escolhido no calendário (o banco de dados aplica a mesma regra de
+  // quem vê o quê: operacional só a própria linha; total sem nomes).
+  window.gvBuscarDia = async (dia) => {
+    const [tot, lin] = await Promise.all([
+      sb.rpc('produtividade_total_periodo', {p_inicio: dia, p_fim: dia}),
+      sb.from('produtividade').select('dia,analista,acao,qtd').eq('dia', dia).limit(5000)]);
+    const erro = (tot.error || lin.error || {}).message;
+    return {dia, erro, total: tot.data || [], linhas: lin.data || []};
+  };
   window.gvMarcar = async (banco, marcar) => {
     const {error} = marcar
       ? await sb.from('bancos_sem_operacao').upsert({banco, dia: hojeBR(), marcado_em: new Date().toISOString(), marcado_por: ((await sb.auth.getUser()).data.user?.email || '').toLowerCase()}, {onConflict: 'dia,banco'})
