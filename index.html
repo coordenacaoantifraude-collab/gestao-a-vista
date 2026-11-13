@@ -260,6 +260,17 @@ font-family:'Sora',sans-serif;font-size:.9375rem;line-height:1.5;color:var(--fg)
 .gv tbody tr:hover td{background:var(--glass)}
 .gv td.n,.gv th.n{text-align:right}
 .gv-scroll{overflow:auto;max-height:26rem}
+.gv-robos{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,19rem),1fr));gap:.75rem}
+.gv-robo{border:1px solid var(--line);border-radius:1rem;padding:.8rem .9rem;background:var(--glass);display:flex;flex-direction:column;gap:.45rem;min-width:0}
+.gv-robo.erro,.gv-robo.parado{border-color:var(--red)}.gv-robo.aviso,.gv-robo.sem-atividade{border-color:var(--warn)}
+.gv-robo .top{display:flex;align-items:center;justify-content:space-between;gap:.5rem}
+.gv-robo .nm{font-weight:600;font-size:1rem}
+.gv-robo .st{font-size:.8125rem;font-weight:600;display:inline-flex;align-items:center;gap:.35rem}
+.gv-robo.erro .st,.gv-robo.parado .st{color:var(--red-t)}.gv-robo.aviso .st,.gv-robo.sem-atividade .st{color:var(--warn)}.gv-robo.ok .st{color:var(--blue-t)}
+.gv-robo .meta{font-size:.8125rem;color:var(--mut)}
+.gv-robo ul{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:.3rem;max-height:11rem;overflow:auto}
+.gv-robo li{font-size:.8125rem;display:grid;grid-template-columns:auto 1fr;gap:.45rem;overflow-wrap:anywhere}
+.gv-robo li b{font-weight:600;font-variant-numeric:tabular-nums}.gv-robo li.erro b{color:var(--red-t)}.gv-robo li.aviso b{color:var(--warn)}
 .gv-alerts{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:.5rem}
 .gv-alerts li{display:grid;grid-template-columns:auto 1fr;gap:.7rem;border:1px solid var(--line);border-radius:1rem;padding:.65rem .8rem;background:var(--glass)}
 .gv-alerts li .ai{font-size:1.125rem;margin-top:.1rem;color:var(--mut)}
@@ -302,6 +313,7 @@ font-family:'Sora',sans-serif;font-size:.9375rem;line-height:1.5;color:var(--fg)
         <button role="tab" id="tab-importacao" aria-selected="false" data-pg="importacao"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m7 10 5 5 5-5"/><path d="M12 15V3"/></svg> Importações</button>
         <button role="tab" id="tab-propostas" aria-selected="false" data-pg="propostas"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h.01"/><path d="M3 12h.01"/><path d="M3 18h.01"/><path d="M8 6h13"/><path d="M8 12h13"/><path d="M8 18h13"/></svg> Propostas</button>
         <button role="tab" id="tab-produtividade" aria-selected="false" data-pg="produtividade"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 3v18h18"/><path d="M7 16v-4"/><path d="M12 16V8"/><path d="M17 16v-7"/></svg> Produtividade</button>
+        <button role="tab" id="tab-robos" aria-selected="false" data-pg="robos"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="8" width="16" height="12" rx="2"/><path d="M12 8V4"/><circle cx="12" cy="3" r="1"/><path d="M9 13v2"/><path d="M15 13v2"/></svg> Robôs</button>
       </div>
     </div>
   </header>
@@ -372,6 +384,15 @@ font-family:'Sora',sans-serif;font-size:.9375rem;line-height:1.5;color:var(--fg)
       <div class="gv-scroll"><table id="gv-prod-todos"><thead></thead><tbody></tbody></table></div>
     </div>
     <p class="gv-note">Contagem do Analítico de "Produtividade por Ação" do BI Antifraude da WebDec (uma linha por ação), só do dia de hoje, atualizada pelo robô a cada 15 minutos. Cada pessoa vê a própria quantidade e o total da equipe; os usuários dos outros só aparecem para administradores.</p>
+  </section>
+
+  <section id="pg-robos" aria-labelledby="tab-robos" hidden style="display:flex;flex-direction:column;gap:1rem">
+    <div class="gv-kpis" id="gv-robos-kpis"></div>
+    <div class="gv-panel">
+      <div class="gv-sec"><h2 id="sec-robos">Acompanhamento dos robôs</h2><span id="gv-robos-hora">—</span></div>
+      <div class="gv-robos" id="gv-robos"></div>
+      <p class="gv-note" style="margin-top:.6rem">O monitor confere a cada 2 minutos, no notebook dos robôs, se cada um está ligado e lê o log de hoje. Erro ou aviso da última 1 h pinta o cartão; "Sem atividade" é robô ligado que não registra nada há mais de 40 min em horário de trabalho. Por privacidade, números longos (CPF, conta, proposta) e e-mails aparecem mascarados.</p>
+    </div>
   </section>
 
   <section id="pg-propostas" aria-labelledby="tab-propostas" hidden style="display:flex;flex-direction:column;gap:1rem">
@@ -509,7 +530,7 @@ let page = 'agora', sortK = 'sem_atuacao', sortDir = -1;
 
 function tabs() {
   document.querySelectorAll('.gv-tabs button').forEach((b) => b.setAttribute('aria-selected', String(b.dataset.pg === page)));
-  ['agora', 'sla', 'importacao', 'propostas', 'produtividade'].forEach((p) => { $('#pg-' + p).hidden = p !== page; });
+  ['agora', 'sla', 'importacao', 'propostas', 'produtividade', 'robos'].forEach((p) => { $('#pg-' + p).hidden = p !== page; });
 }
 document.querySelectorAll('.gv-tabs button').forEach((b) => b.addEventListener('click', () => { page = b.dataset.pg; tabs(); dash.setLink(b.id); render(); }));
 $('#gv-q').addEventListener('input', () => render());
@@ -671,6 +692,43 @@ function render() {
   if (page === 'importacao') bancos(d('importacao'));
   if (page === 'propostas') lista(d('fila'));
   if (page === 'produtividade') produtividade(window.gvProd);
+  if (page === 'robos') robos(window.gvRobos);
+}
+
+// Robôs: vem de window.gvRobos (tabela robos_status, gravada pelo monitor a cada 2 minutos).
+const ROBO_ST = {ok: ['Funcionando', 'ok'], aviso: ['Com aviso', 'warn'], erro: ['Com erro', 'bad'],
+  parado: ['Parado', 'bad'], 'sem atividade': ['Sem atividade', 'warn']};
+function robos(r) {
+  const box = $('#gv-robos'), kp = $('#gv-robos-kpis');
+  if (!r) { box.replaceChildren(h('div', 'gv-note', 'Carregando…')); return; }
+  if (r.erro) { box.replaceChildren(h('div', 'gv-note', 'Não foi possível ler o status dos robôs: ' + r.erro)); kp.replaceChildren(); return; }
+  const lista = [...r.linhas].sort((a, b) => (a.robo === 'gestao-a-vista' ? -1 : b.robo === 'gestao-a-vista' ? 1 : a.nome.localeCompare(b.nome)));
+  const ultimo = lista.reduce((a, x) => (x.atualizado_em > a ? x.atualizado_em : a), '');
+  // Monitor sem gravar há mais de 6 min: o status abaixo pode estar velho.
+  const velho = ultimo && (Date.now() - new Date(ultimo).getTime()) > 6 * 60000;
+  $('#gv-robos-hora').textContent = !ultimo ? 'Monitor ainda não enviou dados'
+    : (velho ? 'Monitor sem atualizar desde ' : 'Conferido às ') + hhmm(ultimo);
+  const conta = (f) => lista.filter(f).length;
+  const kpi = (l, v, tom) => { const k = h('div', 'gv-panel gv-kpi' + (tom && v ? ' ' + tom : '')); k.append(h('div', 'l', l), h('div', 'v', NF.format(v))); return k; };
+  kp.replaceChildren(kpi('Robôs', lista.length), kpi('Funcionando', conta((x) => x.situacao === 'ok')),
+    kpi('Com erro ou parados', conta((x) => x.situacao === 'erro' || x.situacao === 'parado'), 'bad'),
+    kpi('Com aviso ou sem atividade', conta((x) => x.situacao === 'aviso' || x.situacao === 'sem atividade'), 'warn'));
+  if (!lista.length) { box.replaceChildren(h('div', 'gv-note', 'Nenhum robô informado ainda.')); return; }
+  box.replaceChildren(...lista.map((x) => {
+    const [rot, tom] = ROBO_ST[x.situacao] || [x.situacao, ''];
+    const c = h('article', 'gv-robo ' + x.situacao.replace(' ', '-'));
+    const top = h('div', 'top'); const st = h('span', 'st'); st.append(h('i', 'gv-dot ' + tom), document.createTextNode(velho ? rot + ' (status antigo)' : rot));
+    top.append(h('span', 'nm', x.nome), st);
+    const meta = h('div', 'meta', (x.rodando ? 'Ligado' : 'Desligado') + ' · última atividade ' + (x.ultima_atividade ? 'às ' + hhmm(x.ultima_atividade) : 'hoje: nenhuma'));
+    c.append(top, meta);
+    const ev = x.eventos || [];
+    if (ev.length) {
+      const ul = h('ul'); ul.setAttribute('aria-label', 'Erros e avisos de hoje');
+      ev.forEach((e) => { const li = h('li', e.nivel); li.append(h('b', '', e.hora + ' ' + (e.nivel === 'erro' ? 'Erro' : 'Aviso')), h('span', '', e.mensagem)); ul.append(li); });
+      c.append(ul);
+    } else c.append(h('div', 'meta', 'Nenhum erro ou aviso hoje.'));
+    return c;
+  }));
 }
 
 // Produtividade: vem de window.gvProd (carregado no script de login). O banco de dados já filtra:
@@ -802,6 +860,9 @@ if (named && named.dataset && named.dataset.pg) { page = named.dataset.pg; tabs(
     window.gvProd = {hoje: dia, segunda, totalDia: totDia.data || [], totalSemana: totSem.data || [],
       meu: meu.data || null, admin: !!window.gvAdmin, linhas,
       atualizado: deHoje.reduce((a, r) => (r.atualizado_em > a ? r.atualizado_em : a), '') || null};
+    // Status dos robôs (aba Robôs). Se falhar, só essa aba mostra o erro.
+    const rb = await sb.from('robos_status').select('robo,nome,rodando,situacao,ultima_atividade,eventos,atualizado_em');
+    window.gvRobos = rb.error ? {erro: rb.error.message} : {linhas: rb.data || []};
     dash._carregar(conj);
   }
   const hojeBR = () => new Intl.DateTimeFormat('en-CA', {timeZone: 'America/Sao_Paulo'}).format(new Date());
