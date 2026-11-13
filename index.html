@@ -271,6 +271,7 @@ font-family:'Sora',sans-serif;font-size:.9375rem;line-height:1.5;color:var(--fg)
 .gv-robo ul{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:.3rem;max-height:11rem;overflow:auto}
 .gv-robo li{font-size:.8125rem;display:grid;grid-template-columns:auto 1fr;gap:.45rem;overflow-wrap:anywhere}
 .gv-robo li b{font-weight:600;font-variant-numeric:tabular-nums}.gv-robo li.erro b{color:var(--red-t)}.gv-robo li.aviso b{color:var(--warn)}
+.gv-robo li.resolvido{color:var(--mut)}.gv-robo li.resolvido b{color:var(--mut)}
 .gv-alerts{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:.5rem}
 .gv-alerts li{display:grid;grid-template-columns:auto 1fr;gap:.7rem;border:1px solid var(--line);border-radius:1rem;padding:.65rem .8rem;background:var(--glass)}
 .gv-alerts li .ai{font-size:1.125rem;margin-top:.1rem;color:var(--mut)}
@@ -391,7 +392,7 @@ font-family:'Sora',sans-serif;font-size:.9375rem;line-height:1.5;color:var(--fg)
     <div class="gv-panel">
       <div class="gv-sec"><h2 id="sec-robos">Acompanhamento dos robôs</h2><span id="gv-robos-hora">—</span></div>
       <div class="gv-robos" id="gv-robos"></div>
-      <p class="gv-note" style="margin-top:.6rem">O monitor confere a cada 2 minutos, no notebook dos robôs, se cada um está ligado e lê o log de hoje. Erro ou aviso da última 1 h pinta o cartão; "Sem atividade" é robô ligado que não registra nada há mais de 40 min em horário de trabalho. Por privacidade, números longos (CPF, conta, proposta) e e-mails aparecem mascarados.</p>
+      <p class="gv-note" style="margin-top:.6rem">O monitor confere a cada 2 minutos, no notebook dos robôs, se cada um está ligado e lê o log de hoje. Erro ou aviso da última 1 h só pinta o cartão se o robô ainda não completou um ciclo com sucesso depois dele; os já superados aparecem apagados, com "(resolvido)", e o aviso de rotina "Início do robô: confirme o login" não pinta o cartão. "Sem atividade" é robô ligado que não registra nada há mais de 40 min em horário de trabalho. Por privacidade, números longos (CPF, conta, proposta) e e-mails aparecem mascarados.</p>
     </div>
   </section>
 
@@ -724,7 +725,11 @@ function robos(r) {
     const ev = x.eventos || [];
     if (ev.length) {
       const ul = h('ul'); ul.setAttribute('aria-label', 'Erros e avisos de hoje');
-      ev.forEach((e) => { const li = h('li', e.nivel); li.append(h('b', '', e.hora + ' ' + (e.nivel === 'erro' ? 'Erro' : 'Aviso')), h('span', '', e.mensagem)); ul.append(li); });
+      ev.forEach((e) => {
+        const li = h('li', e.nivel + (e.resolvido ? ' resolvido' : ''));
+        li.append(h('b', '', e.hora + ' ' + (e.nivel === 'erro' ? 'Erro' : 'Aviso')), h('span', '', e.mensagem + (e.resolvido ? ' (resolvido)' : '')));
+        ul.append(li);
+      });
       c.append(ul);
     } else c.append(h('div', 'meta', 'Nenhum erro ou aviso hoje.'));
     return c;
