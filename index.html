@@ -663,15 +663,21 @@ function lista(rows) {
   document.querySelectorAll('#gv-lista th.s').forEach((th) => th.setAttribute('aria-sort', th.dataset.k === sortK ? (sortDir > 0 ? 'ascending' : 'descending') : 'none'));
   fillTable($('#gv-lista tbody'), l, (r) => r.ade, [[(r) => r.ade], [(r) => r.banco], [(r) => r.convenio], [(r) => r.caixa], [(r) => BRL(r.valor), 'n'], [(r) => r.caixa === 'Agendada' ? '—' : dur(r.sem_atuacao), 'n'], [(r) => r.agendada_para ? hhmm(r.agendada_para) : '—'], [(r) => r.situacao]]);
 }
-function avisoVelho(atualizado) {
-  const idade = Math.round((Date.now() - new Date(atualizado)) / 60000);
+// st.caixas_em: caixas/propostas/SLA (API, a cada 2 min). st.atualizado_em: importações (tela, a
+// cada 15 min; fica parada quando a WebDec está sem login, mesmo com a API em dia).
+function avisoVelho(st) {
+  const min = (t) => Math.round((Date.now() - new Date(t)) / 60000);
+  const idadeCx = min(st.caixas_em || st.atualizado_em), idadeImp = min(st.atualizado_em);
   const p = Object.fromEntries(new Intl.DateTimeFormat('en-US', {timeZone: 'America/Sao_Paulo', weekday: 'short', hour: 'numeric', hourCycle: 'h23'}).formatToParts(new Date()).map((x) => [x.type, x.value]));
   const comercial = !['Sat', 'Sun'].includes(p.weekday) && Number(p.hour) >= 9 && Number(p.hour) < 19;
-  const velho = comercial && idade > 60;
+  const velho = comercial && idadeCx > (st.caixas_em ? 20 : 60);
+  const impVelha = !velho && comercial && idadeImp > 35;
   const chip = $('#gv-fonte');
-  chip.replaceChildren(h('i', 'gv-dot ' + (velho ? 'bad' : 'ok')),
-    document.createTextNode(velho ? 'Dados velhos: sem atualização há ' + dur(idade) + '. Ver o robô.' : 'Robô · dados da WebDec'));
-  chip.style.borderColor = velho ? 'var(--red)' : '';
+  chip.replaceChildren(h('i', 'gv-dot ' + (velho ? 'bad' : impVelha ? 'warn' : 'ok')),
+    document.createTextNode(velho ? 'Dados velhos: sem atualização há ' + dur(idadeCx) + '. Ver o robô.'
+      : impVelha ? 'Importações e produtividade paradas há ' + dur(idadeImp) + ' (WebDec sem login na janela do robô?). Caixas e SLA em dia.'
+      : 'Robô · dados da WebDec'));
+  chip.style.borderColor = velho ? 'var(--red)' : impVelha ? 'var(--warn)' : '';
 }
 function render() {
   const st = IDS.map((i) => dash.data(i).status);
@@ -682,7 +688,7 @@ function render() {
   const d = (i) => dash.data(i).data;
   $('[data-source=status][data-field=atualizado_em]').textContent = hhmm(d('status')[0].atualizado_em);
   $('[data-source=status][data-field=caixas_em]').textContent = hhmm(d('status')[0].caixas_em || d('status')[0].sla_lido_em);
-  avisoVelho(d('status')[0].atualizado_em);
+  avisoVelho(d('status')[0]);
   document.querySelectorAll('#gv-take b[data-source=import_resumo]').forEach((e) => { e.textContent = d('import_resumo')[0][e.dataset.field]; });
   document.querySelectorAll('#gv-take b[data-source=kpi]').forEach((e) => { e.textContent = d('kpi').find((r) => 'indicador=' + r.indicador === e.dataset.where).valor; });
   $('#gv-take b[data-source=sla_dia]').textContent = String(d('sla_dia').find((r) => r.status === 'Total').pct_prazo).replace('.', ',');
